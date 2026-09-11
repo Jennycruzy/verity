@@ -28,3 +28,22 @@ test("anchors an accepted settlement after the facilitator returns a transaction
   assert.equal(result.transactionId, "0.0.99@1.000000000");
   assert.equal(published.length, 1);
 });
+
+test("reports the Hedera transaction when HCS anchoring fails", async () => {
+  const coordinator = new SettlementCoordinator(
+    new FacilitatorForTest("https://facilitator.invalid"),
+    { publish: async () => { throw new Error("topic unavailable"); } },
+    { settlement: "0.0.7", dispute: "0.0.8" }
+  );
+  await assert.rejects(
+    coordinator.settleAccepted({
+      requestId: "request-2",
+      providerId: "provider-1",
+      buyerId: "buyer-1",
+      ruleId: "fx-rate-v1",
+      paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }, payload: { transaction: "payload" } },
+      paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }
+    }),
+    /VERITY_SETTLEMENT_ANCHOR_FAILED: payment 0\.0\.99@1\.000000000 succeeded/
+  );
+});

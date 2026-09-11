@@ -46,24 +46,29 @@ export class SettlementCoordinator {
     if (state !== "settled") {
       throw new Error(`VERITY_SETTLEMENT_STATE: accepted payment ended in ${state}`);
     }
-    const hcsTransactionId = await this.hcs.publish(this.topics.settlement, {
-      schema: "verity/hcs/v1",
-      kind: "settlement",
-      id: request.requestId,
-      recordedAt: new Date().toISOString(),
-      payload: {
-        requestId: request.requestId,
-        providerId: request.providerId,
-        buyerId: request.buyerId,
-        ruleId: request.ruleId,
-        verdict: "accept",
-        state,
-        transactionId: result.transaction,
-        amount: request.paymentRequirements.amount,
-        assetId: request.paymentRequirements.asset,
-        network: request.paymentRequirements.network
-      }
-    });
+    let hcsTransactionId: string;
+    try {
+      hcsTransactionId = await this.hcs.publish(this.topics.settlement, {
+        schema: "verity/hcs/v1",
+        kind: "settlement",
+        id: request.requestId,
+        recordedAt: new Date().toISOString(),
+        payload: {
+          requestId: request.requestId,
+          providerId: request.providerId,
+          buyerId: request.buyerId,
+          ruleId: request.ruleId,
+          verdict: "accept",
+          state,
+          transactionId: result.transaction,
+          amount: request.paymentRequirements.amount,
+          assetId: request.paymentRequirements.asset,
+          network: request.paymentRequirements.network
+        }
+      });
+    } catch (error) {
+      throw new Error(`VERITY_SETTLEMENT_ANCHOR_FAILED: payment ${result.transaction} succeeded but HCS publication failed`, { cause: error });
+    }
     return { state, transactionId: result.transaction, hcsTransactionId };
   }
 
