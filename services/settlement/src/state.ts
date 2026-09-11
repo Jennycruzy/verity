@@ -26,6 +26,7 @@ export function transition(state: SettlementState, event: SettlementEvent): Sett
     case "adjudicating":
       if (event === "adjudication_upheld") return "void";
       if (event === "adjudication_overturned") return "settled";
+      if (event === "settlement_failed") return "failed";
       break;
     case "settled":
     case "void":

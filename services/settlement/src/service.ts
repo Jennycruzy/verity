@@ -1,6 +1,6 @@
 import { Blocky402Client, type PaymentPayload, type PaymentRequirements, readSettlementConfig } from "@verity/hedera";
 import { createHederaClient, HederaHcsPublisher, type HcsPublisher } from "@verity/hcs";
-import type { DeterministicVerdict, RuleId } from "@verity/types";
+import type { ContentReference, CrossCheckerVerdict, DeterministicVerdict, RuleId } from "@verity/types";
 import { transition, type SettlementState } from "./state.js";
 
 export interface SettlementRequest {
@@ -19,6 +19,10 @@ export interface DisputeResolutionRequest extends SettlementRequest {
   readonly verdict: DeterministicVerdict;
   readonly buyerBondAmount: string;
   readonly providerStakeAmount: string;
+  readonly evaluationInput: ContentReference;
+  readonly buyerResponse: ContentReference;
+  readonly providerResponses: readonly ContentReference[];
+  readonly crossCheckerVerdicts: readonly CrossCheckerVerdict[];
 }
 
 export interface SettlementOutcome {
@@ -72,17 +76,25 @@ export class SettlementCoordinator {
     return { state, transactionId: result.transaction, hcsTransactionId };
   }
 
-  public async recordVoid(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
+  public async recordAdjudication(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
     let state = transition("created", "verified");
     state = transition(state, "held");
     state = transition(state, "adjudication_started");
-    state = transition(state, request.verdict.verdict === "reject" ? "adjudication_upheld" : "adjudication_overturned");
-    if (state !== "void") {
-      throw new Error("VERITY_VOID_EXPECTED: recordVoid requires an upheld provider dispute");
+    let transactionId: string | undefined;
+    if (request.verdict.verdict === "reject") {
+      state = transition(state, "adjudication_upheld");
+    } else {
+      const result = await this.facilitator.settle(request.paymentPayload, request.paymentRequirements);
+      if (!result.success || !result.transaction) {
+        transition(state, "settlement_failed");
+        throw new Error(`VERITY_SETTLEMENT_FAILED: ${result.errorReason ?? "unknown"} ${result.errorMessage ?? ""}`.trim());
+      }
+      transactionId = result.transaction;
+      state = transition(state, "adjudication_overturned");
     }
-    const hcsTransactionId = await this.hcs.publish(this.topics.dispute, {
-      schema: "verity/hcs/v1",
-      kind: "dispute",
+    const record = {
+      schema: "verity/hcs/v1" as const,
+      kind: "dispute" as const,
       id: request.disputeId,
       recordedAt: new Date().toISOString(),
       payload: {
@@ -93,13 +105,26 @@ export class SettlementCoordinator {
         providerRoot: request.providerRoot,
         buyerRoot: request.buyerRoot,
         ruleId: request.ruleId,
+        evaluationInput: request.evaluationInput,
+        buyerResponse: request.buyerResponse,
+        providerResponses: request.providerResponses,
+        crossCheckerVerdicts: request.crossCheckerVerdicts,
         verdict: request.verdict.verdict,
         buyerBondAmount: request.buyerBondAmount,
         providerStakeAmount: request.providerStakeAmount,
-        resolution: state
+        resolution: state,
+        ...(transactionId ? { resolutionTransactionId: transactionId } : {})
       }
-    });
-    return { state, hcsTransactionId };
+    };
+    const hcsTransactionId = await this.hcs.publish(this.topics.dispute, record);
+    return { state, ...(transactionId ? { transactionId } : {}), hcsTransactionId };
+  }
+
+  public async recordVoid(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
+    if (request.verdict.verdict !== "reject") {
+      throw new Error("VERITY_VOID_EXPECTED: recordVoid requires an upheld provider dispute");
+    }
+    return this.recordAdjudication(request);
   }
 }
 
