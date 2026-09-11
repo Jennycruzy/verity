@@ -11,25 +11,8 @@ export interface SupportedResponse {
   readonly signers: Readonly<Record<string, readonly string[]>>;
 }
 
-export interface PaymentRequirements {
-  readonly scheme: string;
-  readonly network: string;
-  readonly amount: string;
-  readonly payTo: string;
-  readonly maxTimeoutSeconds: number;
-  readonly asset: string;
-  readonly extra: Readonly<Record<string, unknown>>;
-  readonly resource?: string;
-  readonly description?: string;
-  readonly mimeType?: string;
-}
-
-export interface PaymentPayload {
-  readonly x402Version: number;
-  readonly resource?: Readonly<Record<string, unknown>>;
-  readonly accepted: PaymentRequirements;
-  readonly payload: Readonly<Record<string, unknown>>;
-}
+export type PaymentRequirements = X402PaymentRequirements;
+export type PaymentPayload = X402PaymentPayload;
 
 export interface VerificationResult {
   readonly isValid: boolean;
@@ -38,15 +21,7 @@ export interface VerificationResult {
   readonly invalidMessage?: string;
 }
 
-export interface SettlementResult {
-  readonly success: boolean;
-  readonly transaction?: string;
-  readonly network?: string;
-  readonly payer?: string;
-  readonly errorReason?: string;
-  readonly errorMessage?: string;
-  readonly amount?: string;
-}
+export type SettlementResult = SettleResponse;
 
 export interface HederaCapability {
   readonly x402Version: number;
@@ -167,3 +142,4 @@ function isVerificationResult(value: unknown): value is VerificationResult {
 function isSettlementResult(value: unknown): value is SettlementResult {
   return Boolean(value && typeof value === "object" && typeof (value as SettlementResult).success === "boolean");
 }
+import type { PaymentPayload as X402PaymentPayload, PaymentRequirements as X402PaymentRequirements, SettleResponse } from "@x402/core/types";

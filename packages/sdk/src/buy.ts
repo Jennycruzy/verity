@@ -1,7 +1,5 @@
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
-import { x402Client } from "@x402/core/client";
 import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements, SettleResponse } from "@x402/core/types";
-import { ExactHederaScheme, PrivateKey, createClientHederaSigner } from "@x402/hedera";
 import { Blocky402Client, readBuyerConfig } from "@verity/hedera";
 import { evaluateEntity, evaluateFxRate, RULE_IDS, type DeterministicVerdict, type RuleId } from "@verity/types";
 
@@ -36,6 +34,10 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
 
   const paymentRequired = await parsePaymentRequired(unpaidResponse);
   const requirements = selectRequirements(paymentRequired, config.network, options.maxPrice);
+  const [{ x402Client }, { ExactHederaScheme, PrivateKey, createClientHederaSigner }] = await Promise.all([
+    import("@x402/core/client"),
+    import("@x402/hedera")
+  ]);
   const signer = createClientHederaSigner(
     config.clientAccountId,
     PrivateKey.fromString(config.clientPrivateKey),

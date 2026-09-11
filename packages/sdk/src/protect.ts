@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { decodePaymentSignatureHeader, encodePaymentRequiredHeader } from "@x402/core/http";
-import type { PaymentRequired, PaymentRequirements } from "@x402/core/types";
+import type { Network, PaymentRequired, PaymentRequirements } from "@x402/core/types";
 import { Blocky402Client, discoverHederaCapability, readProviderConfig } from "@verity/hedera";
 import type { RuleId } from "@verity/types";
 
@@ -39,7 +39,7 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
     const amount = await resolvePrice(options.price, protectedRequest);
     const requirements: PaymentRequirements = {
       scheme: capability.scheme,
-      network: capability.network,
+      network: capability.network as Network,
       amount,
       payTo: config.payToAccountId,
       maxTimeoutSeconds: options.maxTimeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS,

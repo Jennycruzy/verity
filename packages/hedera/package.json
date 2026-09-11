@@ -12,7 +12,8 @@
     }
   },
   "dependencies": {
-    "@verity/types": "0.1.0"
+    "@verity/types": "0.1.0",
+    "@x402/core": "2.25.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
