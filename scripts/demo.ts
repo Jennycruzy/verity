@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { buy } from "@verity/sdk";
-import { evaluateEntity, evaluateFxRate } from "@verity/types";
+import { evaluateEntity, evaluateFxRate, type ContentReference } from "@verity/types";
 import { createSettlementCoordinator } from "@verity/settlement";
 import type { PaymentPayload, PaymentRequirements, SettleResponse } from "@x402/core/types";
 
@@ -11,12 +11,18 @@ const providerId = required("VERITY_DEMO_PROVIDER_ID");
 const buyerId = required("VERITY_DEMO_BUYER_ROOT");
 const requestId = randomUUID();
 const coordinator = createSettlementCoordinator();
+const demoIdentityProof = optionalJsonObject("VERITY_DEMO_IDENTITY_PROOF_JSON");
+const demoProviderResponses = optionalJsonReferences("VERITY_DEMO_PROVIDER_RESPONSES_JSON");
 
 const result = await buy(url, {
   evaluate: (value) => evaluateDemoValue(rule, value),
   maxPrice: process.env.VERITY_DEMO_MAX_PRICE,
   bond: process.env.VERITY_DEMO_BOND,
   disputeUrl: process.env.VERITY_DISPUTE_URL,
+  requestId,
+  ...(process.env.VERITY_DEMO_PROVIDER_ROOT?.trim() ? { providerRoot: process.env.VERITY_DEMO_PROVIDER_ROOT.trim() } : {}),
+  ...(demoIdentityProof ? { identityProof: demoIdentityProof, identitySignal: required("VERITY_DEMO_IDENTITY_SIGNAL") } : {}),
+  ...(demoProviderResponses ? { providerResponses: demoProviderResponses } : {}),
   settle: async (paymentPayload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> => {
     const outcome = await coordinator.settleAccepted({
       requestId,
@@ -53,4 +59,30 @@ function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`VERITY_CONFIG_MISSING: ${name} is required`);
   return value;
+}
+
+function optionalJsonObject(name: string): Readonly<Record<string, unknown>> | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`VERITY_CONFIG_INVALID: ${name} must contain valid JSON`, { cause: error });
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`VERITY_CONFIG_INVALID: ${name} must contain a JSON object`);
+  return value as Readonly<Record<string, unknown>>;
+}
+
+function optionalJsonReferences(name: string): readonly ContentReference[] | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`VERITY_CONFIG_INVALID: ${name} must contain valid JSON`, { cause: error });
+  }
+  if (!Array.isArray(value)) throw new Error(`VERITY_CONFIG_INVALID: ${name} must contain a JSON array`);
+  return value as readonly ContentReference[];
 }
