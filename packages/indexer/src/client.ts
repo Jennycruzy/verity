@@ -151,8 +151,15 @@ function selectPaymentRequirements(
 ): PaymentRequirements {
   const requirements = paymentRequired.accepts.find((entry) => entry.network === network && entry.scheme === "exact");
   if (!requirements) throw new Error(`VERITY_GRAPH_PAYMENT_UNSUPPORTED: no exact payment on ${network}`);
-  if (maxPrice !== undefined && BigInt(requirements.amount) > BigInt(maxPrice)) {
-    throw new Error(`VERITY_GRAPH_PRICE_LIMIT: query asks for ${requirements.amount}, maxPrice is ${maxPrice}`);
+  if (!/^\d+$/.test(requirements.amount) || BigInt(requirements.amount) <= 0n) {
+    throw new Error("VERITY_GRAPH_PAYMENT_AMOUNT_INVALID: query payment amount must be a positive integer");
+  }
+  const normalizedMaxPrice = maxPrice?.trim();
+  if (normalizedMaxPrice && (!/^\d+$/.test(normalizedMaxPrice) || BigInt(normalizedMaxPrice) <= 0n)) {
+    throw new Error("VERITY_GRAPH_MAX_PRICE_INVALID: maxPrice must be a positive integer");
+  }
+  if (normalizedMaxPrice && BigInt(requirements.amount) > BigInt(normalizedMaxPrice)) {
+    throw new Error(`VERITY_GRAPH_PRICE_LIMIT: query asks for ${requirements.amount}, maxPrice is ${normalizedMaxPrice}`);
   }
   if (requirements.extra?.feePayer !== feePayer) {
     throw new Error("VERITY_FEE_PAYER_MISMATCH: graph payment requirements do not match the facilitator capability");

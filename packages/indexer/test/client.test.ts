@@ -74,6 +74,27 @@ test("paid Graph transport rejects an endpoint that skips the payment challenge"
   await assert.rejects(payment.request("https://graph.invalid/query", { method: "POST" }), /VERITY_GRAPH_PAYMENT_REQUIRED/);
 });
 
+test("paid Graph transport treats an empty price limit as unset", async () => {
+  const facilitator = new FacilitatorForTest("https://facilitator.invalid");
+  const transport = new X402GraphPayment(facilitator, {
+    network: "hedera:testnet",
+    accountId: "0.0.2",
+    privateKey: PrivateKey.generateECDSA().toStringRaw(),
+    maxPrice: ""
+  }, async (_input, init) => {
+    if (!init.headers || !(init.headers instanceof Headers) || !init.headers.has("payment-signature")) {
+      return new Response(JSON.stringify({
+        x402Version: 2,
+        resource: { url: "https://graph.invalid", description: "test", mimeType: "application/json" },
+        accepts: [{ scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }]
+      }), { status: 402 });
+    }
+    return new Response(JSON.stringify({ data: { provider: { agentId: "agent-1", endpoint: "https://provider.invalid", reliabilityScore: 0.9, completedRequests: 1 } } }), { status: 200 });
+  });
+  const response = await transport.request("https://graph.invalid", { method: "POST" });
+  assert.equal(response.status, 200);
+});
+
 test("rejects reputation data outside the published score bounds", async () => {
   const client = new GraphReputationClient(
     "https://graph.invalid/query",
