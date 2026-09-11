@@ -13,6 +13,22 @@ export interface RuntimeConfig {
   readonly requestTimeoutMs: number;
 }
 
+export interface ProviderConfig {
+  readonly facilitatorUrl: string;
+  readonly network: string;
+  readonly assetId: string;
+  readonly payToAccountId: string;
+  readonly requestTimeoutMs: number;
+}
+
+export interface BuyerConfig {
+  readonly facilitatorUrl: string;
+  readonly network: string;
+  readonly clientAccountId: string;
+  readonly clientPrivateKey: string;
+  readonly requestTimeoutMs: number;
+}
+
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name]?.trim();
   if (!value) {
@@ -52,5 +68,25 @@ export function readDiscoveryConfig(env: NodeJS.ProcessEnv = process.env): Pick<
   return {
     facilitatorUrl: required(env, "BLOCKY402_URL"),
     network: required(env, "HEDERA_NETWORK")
+  };
+}
+
+export function readProviderConfig(env: NodeJS.ProcessEnv = process.env): ProviderConfig {
+  return {
+    facilitatorUrl: required(env, "BLOCKY402_URL"),
+    network: required(env, "HEDERA_NETWORK"),
+    assetId: required(env, "HEDERA_ASSET_ID"),
+    payToAccountId: required(env, "HEDERA_PAY_TO_ACCOUNT_ID"),
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
+  };
+}
+
+export function readBuyerConfig(env: NodeJS.ProcessEnv = process.env): BuyerConfig {
+  return {
+    facilitatorUrl: required(env, "BLOCKY402_URL"),
+    network: required(env, "HEDERA_NETWORK"),
+    clientAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
+    clientPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
   };
 }

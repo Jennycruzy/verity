@@ -12,14 +12,13 @@ export interface SupportedResponse {
 }
 
 export interface PaymentRequirements {
-  readonly x402Version: number;
   readonly scheme: string;
   readonly network: string;
   readonly amount: string;
   readonly payTo: string;
   readonly maxTimeoutSeconds: number;
   readonly asset: string;
-  readonly extra?: Readonly<Record<string, string>>;
+  readonly extra: Readonly<Record<string, unknown>>;
   readonly resource?: string;
   readonly description?: string;
   readonly mimeType?: string;
