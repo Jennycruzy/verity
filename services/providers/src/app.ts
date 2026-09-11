@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createErc8004Registration } from "@verity/indexer";
 import { protect, type ProtectedApplication, type ProtectedRequest } from "@verity/sdk";
 import { canonicalizeEntity, evaluateEntity, evaluateFxRate, RULE_IDS, type RuleId } from "@verity/types";
 import type { ProviderServiceConfig } from "./config.js";
@@ -9,6 +10,19 @@ export function createProviderServer(config: ProviderServiceConfig) {
 
 export function createProviderHandler(config: ProviderServiceConfig) {
   const protectedApplication = config.kind === "fx" ? createFxApplication(config) : createEntityApplication(config);
+  const registration = config.erc8004 ? createErc8004Registration({
+    name: `Verity ${config.kind} provider`,
+    description: config.kind === "fx" ? "An objectively verifiable foreign-exchange rate service." : "An objectively verifiable entity-resolution service.",
+    services: [
+      { name: "x402-resource", endpoint: `${config.erc8004.publicUrl}/${config.kind === "fx" ? "fx" : "entity"}`, version: "1" },
+      { name: "cross-checker", endpoint: `${config.erc8004.publicUrl}/check`, version: "1" },
+      { name: "agent-registration", endpoint: `${config.erc8004.publicUrl}/.well-known/agent-registration.json`, version: "1" }
+    ],
+    x402Support: true,
+    active: true,
+    registrations: [{ agentRegistry: config.erc8004.registry, agentId: config.erc8004.agentId }],
+    supportedTrust: ["verity/hcs/v1"]
+  }) : undefined;
   let protectedHandler: ReturnType<typeof protect> | undefined;
 
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -16,6 +30,18 @@ export function createProviderHandler(config: ProviderServiceConfig) {
     try {
       if (path === "/health") {
         writeJson(response, 200, { status: "ok", provider: config.kind });
+        return;
+      }
+      if (path === "/.well-known/agent-registration.json") {
+        if (request.method !== "GET") {
+          writeJson(response, 405, { error: "method_not_allowed" });
+          return;
+        }
+        if (!registration) {
+          writeJson(response, 503, { error: "agent_registration_not_configured" });
+          return;
+        }
+        writeJson(response, 200, registration);
         return;
       }
       if (request.method === "POST" && path === "/check") {

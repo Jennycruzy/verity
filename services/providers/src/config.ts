@@ -13,6 +13,11 @@ export interface ProviderServiceConfig extends ProviderConfig {
   readonly entityCachedPrice: string;
   readonly entityFreshPrice: string;
   readonly degradeMode: boolean;
+  readonly erc8004?: {
+    readonly publicUrl: string;
+    readonly registry: string;
+    readonly agentId: string;
+  };
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -52,6 +57,20 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
   const degradeMode = booleanValue(env, "DEGRADE_MODE");
   const degradedFxRate = env.DEGRADED_FX_RATE?.trim();
   if (degradeMode && !degradedFxRate) throw new Error("VERITY_PROVIDER_CONFIG_MISSING: DEGRADED_FX_RATE is required when DEGRADE_MODE is true");
+  const publicUrl = env.VERITY_PROVIDER_PUBLIC_URL?.trim();
+  const registry = env.VERITY_ERC8004_REGISTRY?.trim();
+  const agentId = env.VERITY_ERC8004_AGENT_ID?.trim();
+  const identityValues = [publicUrl, registry, agentId].filter(Boolean).length;
+  if (identityValues !== 0 && identityValues !== 3) {
+    throw new Error("VERITY_PROVIDER_CONFIG_INVALID: VERITY_PROVIDER_PUBLIC_URL, VERITY_ERC8004_REGISTRY, and VERITY_ERC8004_AGENT_ID must be set together");
+  }
+  if (publicUrl) {
+    try {
+      new URL(publicUrl);
+    } catch (error) {
+      throw new Error("VERITY_PROVIDER_CONFIG_INVALID: VERITY_PROVIDER_PUBLIC_URL must be an absolute URL", { cause: error });
+    }
+  }
 
   return {
     ...readProviderConfig(env),
@@ -64,6 +83,7 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
     ...(degradedFxRate ? { degradedFxRate } : {}),
     entityCachedPrice: amount(env, "ENTITY_CACHED_PRICE"),
     entityFreshPrice: amount(env, "ENTITY_FRESH_PRICE"),
-    degradeMode
+    degradeMode,
+    ...(publicUrl && registry && agentId ? { erc8004: { publicUrl, registry, agentId } } : {})
   };
 }

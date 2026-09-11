@@ -53,6 +53,33 @@ test("checker endpoint returns a bounded error for oversized input", async () =>
   assert.match(response.body(), /VERITY_CHECKER_BODY_TOO_LARGE/);
 });
 
+test("serves the configured ERC-8004 registration document", async () => {
+  const response = responseForTest();
+  await createProviderHandler({
+    ...config,
+    erc8004: {
+      publicUrl: "https://provider.invalid",
+      registry: "eip155:296:0xregistry",
+      agentId: "7"
+    }
+  })(requestForTest("GET", "/.well-known/agent-registration.json", ""), response.response);
+  assert.equal(response.response.statusCode, 200);
+  assert.deepEqual(JSON.parse(response.body()), {
+    type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+    name: "Verity fx provider",
+    description: "An objectively verifiable foreign-exchange rate service.",
+    services: [
+      { name: "x402-resource", endpoint: "https://provider.invalid/fx", version: "1" },
+      { name: "cross-checker", endpoint: "https://provider.invalid/check", version: "1" },
+      { name: "agent-registration", endpoint: "https://provider.invalid/.well-known/agent-registration.json", version: "1" }
+    ],
+    x402Support: true,
+    active: true,
+    registrations: [{ agentRegistry: "eip155:296:0xregistry", agentId: "7" }],
+    supportedTrust: ["verity/hcs/v1"]
+  });
+});
+
 function requestForTest(method: string, url: string, body: string) {
   const request = Readable.from([Buffer.from(body)]) as Readable & { method: string; url: string; headers: Record<string, string> };
   request.method = method;

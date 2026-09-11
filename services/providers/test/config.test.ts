@@ -37,3 +37,24 @@ test("accepts an exact FX comparison with zero tolerance", () => {
   const config = readProviderServiceConfig({ ...baseEnvironment, FX_TOLERANCE_BPS: "0" });
   assert.equal(config.fxToleranceBps, 0);
 });
+
+test("requires all ERC-8004 publication fields together", () => {
+  assert.throws(
+    () => readProviderServiceConfig({ ...baseEnvironment, VERITY_PROVIDER_PUBLIC_URL: "https://provider.invalid" }),
+    /must be set together/
+  );
+});
+
+test("reads an ERC-8004 publication configuration", () => {
+  const config = readProviderServiceConfig({
+    ...baseEnvironment,
+    VERITY_PROVIDER_PUBLIC_URL: "https://provider.invalid",
+    VERITY_ERC8004_REGISTRY: "eip155:296:0xregistry",
+    VERITY_ERC8004_AGENT_ID: "7"
+  });
+  assert.deepEqual(config.erc8004, {
+    publicUrl: "https://provider.invalid",
+    registry: "eip155:296:0xregistry",
+    agentId: "7"
+  });
+});
