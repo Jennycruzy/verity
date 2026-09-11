@@ -18,6 +18,7 @@
     "graph:mcp": "tsx scripts/verity-mcp.ts",
     "provision:topics": "tsx scripts/provision-topics.ts",
     "register:provider": "tsx scripts/register-provider.ts",
+    "register:agent": "tsx scripts/register-agent.ts",
     "stake:provider": "tsx scripts/stake-provider.ts",
     "content:start": "npm --workspace @verity/content-service start",
     "disputes:start": "npm --workspace @verity/disputes start",

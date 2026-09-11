@@ -145,11 +145,14 @@ The deploy command writes the returned Hedera contract ID to `VERITY_ESCROW_CONT
 ```sh
 npm run register:provider
 npm run stake:provider
+npm run register:agent
 ```
 
 `register:provider` forwards the complete IDKit result to `WORLD_ID_VERIFY_URL`, checks the proof signal against `VERITY_PROVIDER_IDENTITY_SIGNAL`, and writes the verified root to `VERITY_PROVIDER_ROOT`. Use the same `WORLD_ID_DISPUTE_ACTION` for provider registration and disputes so the root is comparable across both roles. The provider proof JSON and signal are local inputs and are never written to HCS.
 
 The script writes a provider record to `VERITY_PROVIDER_REGISTRY_FILE` containing `providerId`, the verified human root, the staked amount, and the provider EVM address. A provider record is not accepted by the dispute service unless all four values validate.
+
+`register:agent` normalizes the ERC-8004 registry reference, anchors the provider's human root and public endpoint in the escrow contract's `AgentRegistered` event, and writes the Hedera transaction ID to `VERITY_PROVIDER_AGENT_REGISTRATION_TX`. The contract rejects a second registration for the same normalized agent reference.
 
 ## Paid request and replay
 
