@@ -32,3 +32,8 @@ test("reads usage prices without applying hidden defaults", () => {
   assert.equal(config.entityFreshPrice, "30");
   assert.equal(config.degradeMode, false);
 });
+
+test("accepts an exact FX comparison with zero tolerance", () => {
+  const config = readProviderServiceConfig({ ...baseEnvironment, FX_TOLERANCE_BPS: "0" });
+  assert.equal(config.fxToleranceBps, 0);
+});

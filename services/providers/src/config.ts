@@ -27,6 +27,12 @@ function positiveInteger(env: NodeJS.ProcessEnv, name: string): number {
   return value;
 }
 
+function nonNegativeInteger(env: NodeJS.ProcessEnv, name: string): number {
+  const value = Number(required(env, name));
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`VERITY_PROVIDER_CONFIG_INVALID: ${name} must be a non-negative integer`);
+  return value;
+}
+
 function booleanValue(env: NodeJS.ProcessEnv, name: string): boolean {
   const value = required(env, name).toLowerCase();
   if (value === "true") return true;
@@ -54,7 +60,7 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
     fxPrice: amount(env, "FX_PRICE"),
     fxPair: required(env, "FX_PAIR"),
     fxReferenceRate: required(env, "FX_REFERENCE_RATE"),
-    fxToleranceBps: positiveInteger(env, "FX_TOLERANCE_BPS"),
+    fxToleranceBps: nonNegativeInteger(env, "FX_TOLERANCE_BPS"),
     ...(degradedFxRate ? { degradedFxRate } : {}),
     entityCachedPrice: amount(env, "ENTITY_CACHED_PRICE"),
     entityFreshPrice: amount(env, "ENTITY_FRESH_PRICE"),
