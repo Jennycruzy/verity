@@ -8,3 +8,5 @@ This repository is new. The boundaries below are intentional:
 - `packages/sdk/`, `services/providers/`, `packages/agent/`, `packages/indexer/`, `apps/explorer/`, and `docs/` are the product-side boundary.
 
 Shared type changes require an entry here explaining the migration. No account IDs, keys, prices, or service URLs belong in source code.
+
+The dispute record now carries an `evaluationInput` content reference. Replay uses that immutable off-chain object together with the recorded rule identifier; existing records are not expected before this schema is published.

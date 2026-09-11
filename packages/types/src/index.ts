@@ -53,6 +53,7 @@ export interface DisputeRecord {
   readonly ruleId: RuleId;
   readonly buyerRoot: string;
   readonly providerRoot: string;
+  readonly evaluationInput: ContentReference;
   readonly buyerResponse: ContentReference;
   readonly providerResponses: readonly ContentReference[];
   readonly crossCheckerVerdicts: readonly DeterministicVerdict[];
