@@ -15,6 +15,13 @@ export interface DeterministicVerdict {
   readonly evidence: Readonly<Record<string, string | number | boolean>>;
 }
 
+export interface CrossCheckerVerdict {
+  readonly checkerId: string;
+  readonly ruleId: RuleId;
+  readonly verdict: Verdict;
+  readonly reasonCode: string;
+}
+
 export interface FxRateObservation {
   readonly expectedRate: string;
   readonly actualRate: string;
@@ -56,7 +63,7 @@ export interface DisputeRecord {
   readonly evaluationInput: ContentReference;
   readonly buyerResponse: ContentReference;
   readonly providerResponses: readonly ContentReference[];
-  readonly crossCheckerVerdicts: readonly DeterministicVerdict[];
+  readonly crossCheckerVerdicts: readonly CrossCheckerVerdict[];
   readonly verdict: Verdict;
   readonly buyerBondAmount: string;
   readonly providerStakeAmount: string;

@@ -1,4 +1,4 @@
-import type { DeterministicVerdict, RuleId, Verdict } from "@verity/types";
+import type { CrossCheckerVerdict, DeterministicVerdict, RuleId, Verdict } from "@verity/types";
 
 export interface CrossCheckInput {
   readonly ruleId: RuleId;
@@ -13,7 +13,7 @@ export interface CrossChecker {
 export interface AdjudicationResult {
   readonly ruleId: RuleId;
   readonly verdict: Verdict;
-  readonly votes: readonly { checkerId: string; verdict: Verdict; reasonCode: string }[];
+  readonly votes: readonly CrossCheckerVerdict[];
 }
 
 export async function adjudicate(input: CrossCheckInput, checkers: readonly CrossChecker[]): Promise<AdjudicationResult> {
@@ -25,7 +25,7 @@ export async function adjudicate(input: CrossCheckInput, checkers: readonly Cros
     if (verdict.ruleId !== input.ruleId) {
       throw new Error(`VERITY_CHECKER_RULE_MISMATCH: ${checker.id} returned ${verdict.ruleId}`);
     }
-    return { checkerId: checker.id, verdict: verdict.verdict, reasonCode: verdict.reasonCode };
+    return { checkerId: checker.id, ruleId: verdict.ruleId, verdict: verdict.verdict, reasonCode: verdict.reasonCode };
   }));
   const accepted = votes.filter((vote) => vote.verdict === "accept").length;
   const rejected = votes.length - accepted;
