@@ -1,16 +1,24 @@
 import { createHash } from "node:crypto";
-import { ContractExecuteTransaction, ContractFunctionParameters, Hbar, type Client } from "@hiero-ledger/sdk";
+import { ContractExecuteTransaction, ContractFunctionParameters, Hbar, ScheduleCreateTransaction, Timestamp, type Client } from "@hiero-ledger/sdk";
 import BigNumber from "bignumber.js";
 
 export interface EscrowCallResult {
   readonly transactionId: string;
 }
 
+export interface EscrowScheduleResult extends EscrowCallResult {
+  readonly scheduleId: string;
+}
+
 export interface EscrowExecutor {
   execute(functionName: string, parameters: ContractFunctionParameters, payableTinybars?: string): Promise<EscrowCallResult>;
 }
 
-export class HederaEscrowExecutor implements EscrowExecutor {
+export interface EscrowScheduler {
+  schedule(functionName: string, parameters: ContractFunctionParameters, expirationTime: Date, memo: string): Promise<EscrowScheduleResult>;
+}
+
+export class HederaEscrowExecutor implements EscrowExecutor, EscrowScheduler {
   public constructor(
     private readonly client: Client,
     private readonly contractId: string,
@@ -31,6 +39,29 @@ export class HederaEscrowExecutor implements EscrowExecutor {
     const response = await transaction.execute(this.client);
     await response.getReceipt(this.client);
     return { transactionId: response.transactionId.toString() };
+  }
+
+  public async schedule(
+    functionName: string,
+    parameters: ContractFunctionParameters,
+    expirationTime: Date,
+    memo: string
+  ): Promise<EscrowScheduleResult> {
+    assertFuture(expirationTime);
+    if (!memo.trim()) throw new Error("VERITY_ESCROW_SCHEDULE_MEMO_MISSING: scheduled calls require a non-empty memo");
+    const scheduledCall = new ContractExecuteTransaction()
+      .setContractId(this.contractId)
+      .setGas(this.gas)
+      .setFunction(functionName, parameters);
+    const response = await new ScheduleCreateTransaction()
+      .setScheduledTransaction(scheduledCall)
+      .setExpirationTime(Timestamp.fromDate(expirationTime))
+      .setWaitForExpiry(true)
+      .setScheduleMemo(memo)
+      .execute(this.client);
+    const receipt = await response.getReceipt(this.client);
+    if (!receipt.scheduleId) throw new Error("VERITY_ESCROW_SCHEDULE_FAILED: schedule creation returned no schedule ID");
+    return { transactionId: response.transactionId.toString(), scheduleId: receipt.scheduleId.toString() };
   }
 }
 
@@ -54,6 +85,39 @@ export class VerityEscrowClient {
         .addBytes32(toBytes32(disputeId))
         .addBytes32(toBytes32(providerRoot)),
       parseTinybars(amountTinybars)
+    );
+  }
+
+  public postBondWithExpiry(disputeId: string, providerRoot: string, amountTinybars: string, expiresAt: Date): Promise<EscrowCallResult> {
+    return this.executor.execute(
+      "postBondWithExpiry",
+      new ContractFunctionParameters()
+        .addBytes32(toBytes32(disputeId))
+        .addBytes32(toBytes32(providerRoot))
+        .addUint256(new BigNumber(toUnixSeconds(expiresAt))),
+      parseTinybars(amountTinybars)
+    );
+  }
+
+  public scheduleBondExpiry(
+    disputeId: string,
+    buyerAddress: string,
+    expiresAt: Date,
+    memo = `verity/bond-expiry/${disputeId}`
+  ): Promise<EscrowScheduleResult> {
+    assertFuture(expiresAt);
+    if (!memo.trim()) throw new Error("VERITY_ESCROW_SCHEDULE_MEMO_MISSING: scheduled calls require a non-empty memo");
+    const scheduler = this.executor as EscrowExecutor & Partial<EscrowScheduler>;
+    if (typeof scheduler.schedule !== "function") {
+      throw new Error("VERITY_ESCROW_SCHEDULER_UNAVAILABLE: use HederaEscrowExecutor to schedule bond expiry");
+    }
+    return scheduler.schedule(
+      "releaseExpiredBond",
+      new ContractFunctionParameters()
+        .addBytes32(toBytes32(disputeId))
+        .addAddress(normalizeEvmAddress(buyerAddress)),
+      expiresAt,
+      memo
     );
   }
 
@@ -124,6 +188,19 @@ function parseTinybars(value: string): string {
     throw new Error("VERITY_ESCROW_AMOUNT_INVALID: use a positive integer in tinybars");
   }
   return normalized;
+}
+
+function toUnixSeconds(value: Date): number {
+  assertFuture(value);
+  const seconds = Math.floor(value.getTime() / 1000);
+  if (!Number.isSafeInteger(seconds) || seconds <= 0) throw new Error("VERITY_ESCROW_EXPIRY_INVALID: expiry must fit a positive Unix timestamp");
+  return seconds;
+}
+
+function assertFuture(value: Date): void {
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime()) || value.getTime() <= Date.now()) {
+    throw new Error("VERITY_ESCROW_EXPIRY_INVALID: expiry must be a future date");
+  }
 }
 
 function normalizeEvmAddress(value: string): string {

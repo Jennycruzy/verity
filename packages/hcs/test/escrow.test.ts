@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import { PrivateKey } from "@hiero-ledger/sdk";
 import test from "node:test";
-import { createHederaClient, toBytes32, VerityEscrowClient, type EscrowCallResult, type EscrowExecutor } from "../src/index.ts";
+import { createHederaClient, toBytes32, VerityEscrowClient, type EscrowCallResult, type EscrowExecutor, type EscrowScheduleResult, type EscrowScheduler } from "../src/index.ts";
 
-class ExecutorForTest implements EscrowExecutor {
+class ExecutorForTest implements EscrowExecutor, EscrowScheduler {
   public readonly calls: { functionName: string; payableTinybars?: string }[] = [];
 
   public async execute(functionName: string, _parameters: never, payableTinybars?: string): Promise<EscrowCallResult> {
     this.calls.push({ functionName, ...(payableTinybars === undefined ? {} : { payableTinybars }) });
     return { transactionId: "0.0.7@1.000000000" };
+  }
+
+  public async schedule(functionName: string, _parameters: never, _expirationTime: Date, _memo: string): Promise<EscrowScheduleResult> {
+    this.calls.push({ functionName });
+    return { transactionId: "0.0.7@2.000000000", scheduleId: "0.0.8" };
   }
 }
 
@@ -32,6 +37,8 @@ test("escrow calls preserve payable amounts and method names", async () => {
   const escrow = new VerityEscrowClient(executor);
   await escrow.registerAgent("7", "human-root", "https://provider.example/fx");
   await escrow.postBond("dispute-1", "buyer-root", "100");
+  await escrow.postBondWithExpiry("dispute-2", "buyer-root", "100", new Date(Date.now() + 120_000));
+  await escrow.scheduleBondExpiry("dispute-2", `0x${"03".repeat(20)}`, new Date(Date.now() + 120_000));
   await escrow.stakeProvider("provider-root", "200");
   await escrow.lockStake("dispute-1", "50");
   await escrow.resolveBond("dispute-1", true, `0x${"01".repeat(20)}`, `0x${"02".repeat(20)}`);
@@ -39,6 +46,8 @@ test("escrow calls preserve payable amounts and method names", async () => {
   assert.deepEqual(executor.calls, [
     { functionName: "registerAgent" },
     { functionName: "postBond", payableTinybars: "100" },
+    { functionName: "postBondWithExpiry", payableTinybars: "100" },
+    { functionName: "releaseExpiredBond" },
     { functionName: "stakeProvider", payableTinybars: "200" },
     { functionName: "lockStake" },
     { functionName: "resolveBond" },
@@ -50,4 +59,5 @@ test("rejects invalid escrow amounts and recipient addresses", async () => {
   const escrow = new VerityEscrowClient(new ExecutorForTest());
   assert.throws(() => escrow.postBond("dispute-1", "provider-root", "0"), /VERITY_ESCROW_AMOUNT_INVALID/);
   assert.throws(() => escrow.resolveBond("dispute-1", false, "0.0.1", `0x${"02".repeat(20)}`), /VERITY_ESCROW_ADDRESS_INVALID/);
+  assert.throws(() => escrow.scheduleBondExpiry("dispute-1", `0x${"02".repeat(20)}`, new Date(Date.now() - 1)), /VERITY_ESCROW_EXPIRY_INVALID/);
 });

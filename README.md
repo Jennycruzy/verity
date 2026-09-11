@@ -201,7 +201,7 @@ The resource server delivers before settlement, so the payment hold must survive
 | Proof of Human root | `packages/agent/src/identity.ts:1` | Adapter implemented; World credentials/config required |
 | Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor implemented; public score indexing remains |
 | Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
-| Scheduled transactions | — | Not implemented |
+| Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88` and `packages/hcs/src/escrow.ts:42` | Expiring bonds and wait-for-expiry scheduling implemented; needs a live testnet run |
 | HTS custom fee settlement asset | — | Not implemented |
 | ERC-8004/HCS-14 registry | `packages/indexer/src/erc8004.ts:1` | Standard identity primitives implemented; live Hedera registry is not available in the current target deployment |
 
