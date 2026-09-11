@@ -5,6 +5,7 @@
     { "path": "./packages/hedera" },
     { "path": "./packages/hcs" },
     { "path": "./packages/sdk" },
-    { "path": "./packages/replay" }
+    { "path": "./packages/replay" },
+    { "path": "./services/providers" }
   ]
 }
