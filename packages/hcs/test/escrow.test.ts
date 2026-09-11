@@ -30,12 +30,14 @@ test("creates Hedera clients with the configured ECDSA operator key", () => {
 test("escrow calls preserve payable amounts and method names", async () => {
   const executor = new ExecutorForTest();
   const escrow = new VerityEscrowClient(executor);
+  await escrow.registerAgent("7", "human-root", "https://provider.example/fx");
   await escrow.postBond("dispute-1", "buyer-root", "100");
   await escrow.stakeProvider("provider-root", "200");
   await escrow.lockStake("dispute-1", "50");
   await escrow.resolveBond("dispute-1", true, `0x${"01".repeat(20)}`, `0x${"02".repeat(20)}`);
   await escrow.anchorReputation("provider-root", "buyer-root", false, true);
   assert.deepEqual(executor.calls, [
+    { functionName: "registerAgent" },
     { functionName: "postBond", payableTinybars: "100" },
     { functionName: "stakeProvider", payableTinybars: "200" },
     { functionName: "lockStake" },

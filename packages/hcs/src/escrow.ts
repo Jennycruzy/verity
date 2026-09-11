@@ -37,6 +37,16 @@ export class HederaEscrowExecutor implements EscrowExecutor {
 export class VerityEscrowClient {
   public constructor(private readonly executor: EscrowExecutor) {}
 
+  public registerAgent(agentId: string, humanRoot: string, endpoint: string): Promise<EscrowCallResult> {
+    return this.executor.execute(
+      "registerAgent",
+      new ContractFunctionParameters()
+        .addBytes32(toBytes32(agentId))
+        .addBytes32(toBytes32(humanRoot))
+        .addBytes32(toBytes32(endpoint))
+    );
+  }
+
   public postBond(disputeId: string, providerRoot: string, amountTinybars: string): Promise<EscrowCallResult> {
     return this.executor.execute(
       "postBond",
