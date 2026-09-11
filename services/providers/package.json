@@ -1,0 +1,17 @@
+{
+  "name": "@verity/providers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "dependencies": {
+    "@verity/hedera": "0.1.0",
+    "@verity/sdk": "0.1.0",
+    "@verity/types": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/*.test.ts"
+  }
+}
