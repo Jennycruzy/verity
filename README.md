@@ -115,7 +115,7 @@ npm run demo
 
 The buyer calls the provider, receives the response, evaluates it locally, and settles an accepted response through the settlement coordinator. A successful run prints the facilitator transaction ID and HCS transaction ID. Those IDs can be opened using the configured HashScan testnet base URL.
 
-For a rejected response, the buyer additionally needs a World ID proof, `VERITY_DISPUTE_URL`, a positive bond, three content references for the checker responses, the escrow contract settings, and a running dispute service. The rejection path posts the bond before it sends the dispute request. There is no local identity substitute in the live path.
+For a rejected response, the buyer additionally needs a World ID proof, `VERITY_DISPUTE_URL`, a positive bond, one content reference per configured checker response, the escrow contract settings, and a running dispute service. The rejection path posts the bond before it sends the dispute request. There is no local identity substitute in the live path.
 
 After a dispute receipt is visible on the configured topic:
 

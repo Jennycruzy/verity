@@ -10,7 +10,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
   process.env.HEDERA_CLIENT_ACCOUNT_ID = "0.0.2";
   process.env.HEDERA_CLIENT_PRIVATE_KEY = PrivateKey.generateECDSA().toStringRaw();
   const calls: string[] = [];
-  const references = [reference("checker-a"), reference("checker-b"), reference("checker-c")];
+  const references = [reference("checker-a"), reference("checker-b"), reference("checker-c"), reference("checker-d"), reference("checker-e")];
   const contentStore = {
     async putJson(value: unknown): Promise<ContentReference> {
       calls.push(`content:${JSON.stringify(value)}`);
@@ -38,7 +38,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     assert.equal(body.bondTransactionId, "0.0.9@1.000000000");
     assert.equal(body.providerRoot, undefined);
-    assert.equal((body.providerResponses as unknown[]).length, 3);
+    assert.equal((body.providerResponses as unknown[]).length, 5);
     return new Response(JSON.stringify({ state: "void", hcsTransactionId: "0.0.8@2.000000000" }), { status: 201, headers: { "content-type": "application/json" } });
   };
   const result = await buy("https://provider.invalid/fx", {

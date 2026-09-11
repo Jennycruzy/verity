@@ -101,8 +101,8 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   if (!identityProof) throw new Error("VERITY_IDENTITY_PROOF_MISSING: provide a verified World ID proof before rejecting a response");
   const identitySignal = requiredOption(options.identitySignal, "VERITY_IDENTITY_SIGNAL_MISSING: provide the signal bound to the dispute");
   const providerResponses = options.providerResponses;
-  if (!providerResponses || providerResponses.length !== 3) {
-    throw new Error("VERITY_PROVIDER_RESPONSES_MISSING: provide exactly three independent provider response references");
+  if (!providerResponses || providerResponses.length < 3 || providerResponses.length % 2 === 0) {
+    throw new Error("VERITY_PROVIDER_RESPONSES_MISSING: provide an odd number of at least three independent provider response references");
   }
 
   const contentStore = options.contentStore ?? new HttpContentStore(requiredEnvironment("CONTENT_STORE_BASE_URL"));

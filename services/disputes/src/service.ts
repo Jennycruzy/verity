@@ -190,7 +190,7 @@ function validateSubmission(value: DisputeSubmission, checkerCount: number): voi
   validateReference(value.evaluationInput, "evaluationInput");
   validateReference(value.buyerResponse, "buyerResponse");
   if (value.providerResponses.length !== checkerCount) {
-    throw new DisputeInputError(`VERITY_PROVIDER_RESPONSES: expected ${checkerCount} provider response references`);
+    throw new DisputeInputError(`VERITY_PROVIDER_RESPONSES: expected one response reference for each of the ${checkerCount} configured checkers`);
   }
   for (const reference of value.providerResponses) validateReference(reference, "providerResponses");
 }

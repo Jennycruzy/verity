@@ -65,7 +65,7 @@ test("rejects a conflicting retry and missing providers", async () => {
   await assert.rejects(processor.submit({ ...submissionForTest(), disputeId: "dispute-2", providerId: "missing" }), /VERITY_PROVIDER_UNKNOWN/);
 });
 
-test("requires exactly three provider response references", async () => {
+test("requires one provider response reference per checker", async () => {
   const content: ContentStore = { putJson: async () => ref("{}"), readJson: async () => input };
   const settlement = { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "hcs-1" }) };
   const processor = new DisputeProcessor(
