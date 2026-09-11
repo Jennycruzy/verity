@@ -5,6 +5,7 @@ import { VerityBondEscrow } from "../src/VerityBondEscrow.sol";
 
 interface Vm {
     function deal(address account, uint256 newBalance) external;
+    function warp(uint256 timestamp) external;
 }
 
 contract Actor {
@@ -12,6 +13,10 @@ contract Actor {
 
     function postBond(address payable escrow, bytes32 disputeId, bytes32 providerRoot) external payable {
         VerityBondEscrow(escrow).postBond{ value: msg.value }(disputeId, providerRoot);
+    }
+
+    function postBondWithExpiry(address payable escrow, bytes32 disputeId, bytes32 providerRoot, uint256 expiresAt) external payable {
+        VerityBondEscrow(escrow).postBondWithExpiry{ value: msg.value }(disputeId, providerRoot, expiresAt);
     }
 
     function stake(address payable escrow, bytes32 providerRoot) external payable {
@@ -101,7 +106,7 @@ contract VerityBondEscrowTest {
             )
         );
         require(!success, "operator redirected bond to an unrecorded buyer");
-        (,,, bool resolved) = escrow.bonds(DISPUTE);
+        (,,,, bool resolved) = escrow.bonds(DISPUTE);
         require(!resolved, "invalid resolution changed bond state");
     }
 
@@ -127,5 +132,26 @@ contract VerityBondEscrowTest {
             abi.encodeWithSelector(VerityBondEscrow.registerAgent.selector, agentId, PROVIDER_ROOT, endpointHash)
         );
         require(!success, "duplicate agent registration succeeded");
+    }
+
+    function testExpiredBondReturnsToBuyer() public {
+        uint256 expiry = block.timestamp + 1 days;
+        bytes32 expiringDispute = keccak256("expiring-dispute");
+        buyer.postBondWithExpiry{ value: BOND }(
+            payable(address(escrow)),
+            expiringDispute,
+            PROVIDER_ROOT,
+            expiry
+        );
+        (bool tooEarly,) = address(escrow).call(
+            abi.encodeWithSelector(VerityBondEscrow.releaseExpiredBond.selector, expiringDispute, payable(address(buyer)))
+        );
+        require(!tooEarly, "bond released before expiry");
+        vm.warp(expiry);
+        uint256 beforeBalance = address(buyer).balance;
+        escrow.releaseExpiredBond(expiringDispute, payable(address(buyer)));
+        require(address(buyer).balance == beforeBalance + BOND, "expired bond did not return to buyer");
+        (,,,, bool resolved) = escrow.bonds(expiringDispute);
+        require(resolved, "expired bond was not marked resolved");
     }
 }

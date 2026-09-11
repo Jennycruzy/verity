@@ -5,6 +5,8 @@ contract VerityBondEscrow {
     error AlreadyResolved(bytes32 disputeId);
     error AgentAlreadyRegistered(bytes32 agentId);
     error BondAlreadyPosted(bytes32 disputeId);
+    error BondExpiryInvalid();
+    error BondNotExpired(bytes32 disputeId);
     error BondNotFound(bytes32 disputeId);
     error DirectTransferDisabled();
     error InsufficientAvailableStake(bytes32 providerRoot, uint256 requested, uint256 available);
@@ -22,6 +24,7 @@ contract VerityBondEscrow {
         address buyer;
         uint256 amount;
         bytes32 providerRoot;
+        uint256 expiresAt;
         bool resolved;
     }
 
@@ -49,6 +52,7 @@ contract VerityBondEscrow {
 
     event AgentRegistered(bytes32 indexed agentId, bytes32 indexed humanRoot, bytes32 endpointHash);
     event BondPosted(bytes32 indexed disputeId, address indexed buyer, bytes32 indexed providerRoot, uint256 amount);
+    event BondExpired(bytes32 indexed disputeId, address indexed buyer, uint256 bondAmount);
     event BondResolved(bytes32 indexed disputeId, bool providerWasWrong, uint256 bondAmount, uint256 slashedStake);
     event ReputationAnchored(bytes32 indexed providerRoot, bytes32 indexed buyerRoot, bool providerWasCorrect, bool buyerWasHonest);
     event StakeDeposited(bytes32 indexed providerRoot, address indexed owner, uint256 amount);
@@ -81,11 +85,31 @@ contract VerityBondEscrow {
     }
 
     function postBond(bytes32 disputeId, bytes32 providerRoot) external payable {
+        _postBond(disputeId, providerRoot, 0);
+    }
+
+    function postBondWithExpiry(bytes32 disputeId, bytes32 providerRoot, uint256 expiresAt) external payable {
+        if (expiresAt <= block.timestamp) revert BondExpiryInvalid();
+        _postBond(disputeId, providerRoot, expiresAt);
+    }
+
+    function _postBond(bytes32 disputeId, bytes32 providerRoot, uint256 expiresAt) private {
         if (disputeId == bytes32(0) || providerRoot == bytes32(0)) revert InvalidRoot();
         if (msg.value < minimumBond) revert InvalidAmount();
         if (bonds[disputeId].amount != 0) revert BondAlreadyPosted(disputeId);
-        bonds[disputeId] = Bond({ buyer: msg.sender, amount: msg.value, providerRoot: providerRoot, resolved: false });
+        bonds[disputeId] = Bond({ buyer: msg.sender, amount: msg.value, providerRoot: providerRoot, expiresAt: expiresAt, resolved: false });
         emit BondPosted(disputeId, msg.sender, providerRoot, msg.value);
+    }
+
+    function releaseExpiredBond(bytes32 disputeId, address payable buyer) external onlyOperator nonReentrant {
+        Bond storage bond = bonds[disputeId];
+        if (bond.amount == 0) revert BondNotFound(disputeId);
+        if (bond.resolved) revert AlreadyResolved(disputeId);
+        if (bond.expiresAt == 0 || block.timestamp < bond.expiresAt) revert BondNotExpired(disputeId);
+        if (buyer != bond.buyer) revert InvalidResolutionRecipient();
+        bond.resolved = true;
+        _send(buyer, bond.amount);
+        emit BondExpired(disputeId, buyer, bond.amount);
     }
 
     function stakeProvider(bytes32 providerRoot) external payable {
