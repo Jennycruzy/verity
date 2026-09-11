@@ -15,7 +15,6 @@ export interface VerifiedRoot {
 
 export interface RootStore {
   has(action: string, root: string): Promise<boolean>;
-  /** Register a durable human root. Re-registering the same root is idempotent. */
   add(action: string, root: string): Promise<void>;
 }
 
@@ -78,6 +77,9 @@ export class WorldIdVerifier {
     const rootValue = body.nullifier ?? body.nullifierHash ?? body.sessionId ?? body.session_id;
     if (!rootValue) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
     const root = normalizeWorldRoot(rootValue);
+    if (await this.roots.has(this.config.action, root)) {
+      throw new Error("VERITY_WORLD_ID_REPLAY: this root has already been used for the configured action");
+    }
     await this.roots.add(this.config.action, root);
     return { root, action: this.config.action, verifiedAt: new Date().toISOString(), provider: "world-id" };
   }
@@ -92,6 +94,7 @@ export class MemoryRootStore implements RootStore {
 
   public async add(action: string, root: string): Promise<void> {
     const key = `${action}:${root}`;
+    if (this.values.has(key)) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
     this.values.add(key);
   }
 }
@@ -109,7 +112,7 @@ export class FileRootStore implements RootStore {
   public async add(action: string, root: string): Promise<void> {
     const values = await this.read();
     const key = storeKey(action, root);
-    if (values[key] === true) return;
+    if (values[key] === true) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
     values[key] = true;
     await mkdir(dirname(this.path), { recursive: true });
     await writeFile(this.path, JSON.stringify(values), "utf8");
