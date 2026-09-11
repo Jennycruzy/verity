@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { buy } from "@verity/sdk";
-import { evaluateEntity, evaluateFxRate, type ContentReference } from "@verity/types";
+import { evaluateEntity, evaluateFxRate, type ContentReference, type DeterministicVerdict, type EntityObservation, type FxRateObservation } from "@verity/types";
 import { createSettlementCoordinator } from "@verity/settlement";
 import type { PaymentPayload, PaymentRequirements, SettleResponse } from "@x402/core/types";
 
@@ -15,7 +15,8 @@ const demoIdentityProof = optionalJsonObject("VERITY_DEMO_IDENTITY_PROOF_JSON");
 const demoProviderResponses = optionalJsonReferences("VERITY_DEMO_PROVIDER_RESPONSES_JSON");
 
 const result = await buy(url, {
-  evaluate: (value) => evaluateDemoValue(rule, value),
+  evaluate: (value: unknown) => evaluateDemoValue(rule, value),
+  evaluationInput: (value: unknown) => demoEvaluationInput(rule, value),
   maxPrice: process.env.VERITY_DEMO_MAX_PRICE,
   bond: process.env.VERITY_DEMO_BOND,
   disputeUrl: process.env.VERITY_DISPUTE_URL,
@@ -40,19 +41,31 @@ const result = await buy(url, {
 
 console.log(JSON.stringify({ requestId, verdict: result.verdict, settlement: result.settlement, dispute: result.dispute }, null, 2));
 
-function evaluateDemoValue(ruleId: string, value: unknown) {
+function evaluateDemoValue(ruleId: string, value: unknown): DeterministicVerdict {
+  if (ruleId === "fx-rate-v1") return evaluateFxRate(demoFxInput(value));
+  if (ruleId === "entity-canonical-v1") return evaluateEntity(demoEntityInput(value));
+  throw new Error(`VERITY_DEMO_RULE_UNKNOWN: ${ruleId}`);
+}
+
+function demoEvaluationInput(ruleId: string, value: unknown): FxRateObservation | EntityObservation {
+  if (ruleId === "fx-rate-v1") return demoFxInput(value);
+  if (ruleId === "entity-canonical-v1") return demoEntityInput(value);
+  throw new Error(`VERITY_DEMO_RULE_UNKNOWN: ${ruleId}`);
+}
+
+function demoFxInput(value: unknown): FxRateObservation {
   if (!value || typeof value !== "object") throw new Error("VERITY_DEMO_RESPONSE: provider returned a non-object JSON response");
   const record = value as Record<string, unknown>;
-  if (ruleId === "fx-rate-v1") {
-    const toleranceBps = Number(required("VERITY_DEMO_FX_TOLERANCE_BPS"));
-    if (typeof record.rate !== "string") throw new Error("VERITY_DEMO_RESPONSE: FX provider did not return rate");
-    return evaluateFxRate({ expectedRate: required("VERITY_DEMO_EXPECTED_FX_RATE"), actualRate: record.rate, toleranceBps });
-  }
-  if (ruleId === "entity-canonical-v1") {
-    if (typeof record.entity !== "string") throw new Error("VERITY_DEMO_RESPONSE: entity provider did not return entity");
-    return evaluateEntity({ expected: required("VERITY_DEMO_EXPECTED_ENTITY"), actual: record.entity });
-  }
-  throw new Error(`VERITY_DEMO_RULE_UNKNOWN: ${ruleId}`);
+  const toleranceBps = Number(required("VERITY_DEMO_FX_TOLERANCE_BPS"));
+  if (typeof record.rate !== "string") throw new Error("VERITY_DEMO_RESPONSE: FX provider did not return rate");
+  return { expectedRate: required("VERITY_DEMO_EXPECTED_FX_RATE"), actualRate: record.rate, toleranceBps };
+}
+
+function demoEntityInput(value: unknown): EntityObservation {
+  if (!value || typeof value !== "object") throw new Error("VERITY_DEMO_RESPONSE: provider returned a non-object JSON response");
+  const record = value as Record<string, unknown>;
+  if (typeof record.entity !== "string") throw new Error("VERITY_DEMO_RESPONSE: entity provider did not return entity");
+  return { expected: required("VERITY_DEMO_EXPECTED_ENTITY"), actual: record.entity };
 }
 
 function required(name: string): string {

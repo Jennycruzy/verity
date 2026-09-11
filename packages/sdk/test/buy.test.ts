@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { PrivateKey } from "@hiero-ledger/sdk";
 import test from "node:test";
-import { sha256, type ContentReference } from "@verity/types";
+import { evaluateFxRate, sha256, type ContentReference } from "@verity/types";
 import { buy } from "../src/buy.ts";
 
 test("posts a bond before submitting the deterministic dispute payload", async () => {
@@ -42,7 +42,16 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     return new Response(JSON.stringify({ state: "void", hcsTransactionId: "0.0.8@2.000000000" }), { status: 201, headers: { "content-type": "application/json" } });
   };
   const result = await buy("https://provider.invalid/fx", {
-    evaluate: "fx-rate-v1",
+    evaluate: (value: unknown) => {
+      const record = value as { rate?: unknown };
+      if (typeof record.rate !== "string") throw new Error("test response did not contain a rate");
+      return evaluateFxRate({ expectedRate: "1.00", actualRate: record.rate, toleranceBps: 0 });
+    },
+    evaluationInput: (value: unknown) => {
+      const record = value as { rate?: unknown };
+      if (typeof record.rate !== "string") throw new Error("test response did not contain a rate");
+      return { expectedRate: "1.00", actualRate: record.rate, toleranceBps: 0 };
+    },
     bond: "10",
     disputeUrl: "https://dispute.invalid/disputes",
     providerId: "provider-1",

@@ -7,6 +7,7 @@ import { createHederaClient, createVerityEscrowClient } from "@verity/hcs";
 import { evaluateEntity, evaluateFxRate, RULE_IDS, type ContentReference, type DeterministicVerdict, type RuleId } from "@verity/types";
 
 export type Evaluator = RuleId | ((value: unknown, response: Response, requirements: PaymentRequirements) => DeterministicVerdict | Promise<DeterministicVerdict>);
+export type EvaluationInputResolver = (value: unknown, response: Response, requirements: PaymentRequirements) => unknown | Promise<unknown>;
 
 export interface BuyOptions {
   readonly evaluate: Evaluator;
@@ -21,7 +22,7 @@ export interface BuyOptions {
   readonly providerRoot?: string;
   readonly identityProof?: Readonly<Record<string, unknown>>;
   readonly identitySignal?: string;
-  readonly evaluationInput?: unknown;
+  readonly evaluationInput?: unknown | EvaluationInputResolver;
   readonly providerResponses?: readonly ContentReference[];
   readonly contentStore?: ContentStore;
   readonly postBond?: (disputeId: string, providerRoot: string, amountTinybars: string) => Promise<{ transactionId: string }>;
@@ -106,7 +107,12 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   }
 
   const contentStore = options.contentStore ?? new HttpContentStore(requiredEnvironment("CONTENT_STORE_BASE_URL"));
-  const evaluationInput = await contentStore.putJson(options.evaluationInput ?? replayInput(options.evaluate, data));
+  const replayValue = options.evaluationInput === undefined
+    ? replayInput(options.evaluate, data)
+    : typeof options.evaluationInput === "function"
+      ? await options.evaluationInput(data, paidResponse, requirements)
+      : options.evaluationInput;
+  const evaluationInput = await contentStore.putJson(replayValue);
   const buyerResponse = await contentStore.putJson(data);
   const disputeId = options.disputeId ?? randomUUID();
   const requestId = options.requestId ?? randomUUID();
