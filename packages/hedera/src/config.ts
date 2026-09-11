@@ -29,6 +29,17 @@ export interface BuyerConfig {
   readonly requestTimeoutMs: number;
 }
 
+export interface SettlementConfig {
+  readonly facilitatorUrl: string;
+  readonly network: string;
+  readonly assetId: string;
+  readonly operatorAccountId: string;
+  readonly operatorPrivateKey: string;
+  readonly settlementTopicId: string;
+  readonly disputeTopicId: string;
+  readonly requestTimeoutMs: number;
+}
+
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name]?.trim();
   if (!value) {
@@ -87,6 +98,19 @@ export function readBuyerConfig(env: NodeJS.ProcessEnv = process.env): BuyerConf
     network: required(env, "HEDERA_NETWORK"),
     clientAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
     clientPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
+  };
+}
+
+export function readSettlementConfig(env: NodeJS.ProcessEnv = process.env): SettlementConfig {
+  return {
+    facilitatorUrl: required(env, "BLOCKY402_URL"),
+    network: required(env, "HEDERA_NETWORK"),
+    assetId: required(env, "HEDERA_ASSET_ID"),
+    operatorAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
+    operatorPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
+    settlementTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
+    disputeTopicId: required(env, "HCS_DISPUTE_TOPIC_ID"),
     requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
   };
 }
