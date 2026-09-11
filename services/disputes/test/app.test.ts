@@ -48,7 +48,8 @@ function processorForTest(): DisputeProcessor {
     { get: async () => ({ providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }) },
     content,
     checkers,
-    { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "0.0.8@1.000000000" }) }
+    { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "0.0.8@1.000000000" }) },
+    { verify: async () => undefined }
   );
 }
 

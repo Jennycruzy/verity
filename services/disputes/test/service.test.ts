@@ -25,6 +25,7 @@ test("adjudicates a bonded rejection and records the complete result", async () 
       return { state: "void" as const, hcsTransactionId: "0.0.8@1.000000000" };
     }
   };
+  const bondVerifier = { verify: async () => undefined };
   const provider = new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]]));
   const processor = new DisputeProcessor(
     { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
@@ -32,6 +33,7 @@ test("adjudicates a bonded rejection and records the complete result", async () 
     content,
     checkers,
     settlement,
+    bondVerifier,
     new MemoryDisputeStore()
   );
   const submission = submissionForTest();
@@ -55,6 +57,7 @@ test("rejects a conflicting retry and missing providers", async () => {
     content,
     checkers,
     settlement,
+    { verify: async () => undefined },
     new MemoryDisputeStore()
   );
   await processor.submit(submissionForTest());
@@ -67,10 +70,11 @@ test("requires exactly three provider response references", async () => {
   const settlement = { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "hcs-1" }) };
   const processor = new DisputeProcessor(
     { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
-    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20" }]])),
+    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]])),
     content,
     checkers,
-    settlement
+    settlement,
+    { verify: async () => undefined }
   );
   await assert.rejects(processor.submit({ ...submissionForTest(), providerResponses: [] }), /VERITY_PROVIDER_RESPONSES/);
 });

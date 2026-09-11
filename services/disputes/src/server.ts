@@ -3,6 +3,7 @@ import { HttpContentStore } from "@verity/content";
 import { FileRootStore, WorldIdVerifier } from "@verity/agent";
 import { createSettlementCoordinator } from "@verity/settlement";
 import { createDisputeServer } from "./app.js";
+import { MirrorBondVerifier } from "./bond.js";
 import { HttpCrossChecker } from "./crosschecker.js";
 import { readDisputeServiceConfig } from "./config.js";
 import { readProviderRegistry } from "./registry.js";
@@ -22,6 +23,7 @@ const processor = new DisputeProcessor(
   new HttpContentStore(config.contentStoreBaseUrl),
   checkers,
   createSettlementCoordinator(),
+  new MirrorBondVerifier(config.mirrorNodeBaseUrl, config.escrowContractId),
   new FileDisputeStore(config.disputeStoreDirectory)
 );
 const server = createDisputeServer(processor, { maxBodyBytes: config.maxBodyBytes });

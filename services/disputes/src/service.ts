@@ -3,6 +3,7 @@ import type { ContentStore } from "@verity/content";
 import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
 import { sha256, stableJson, RULE_IDS, type ContentReference, type CrossCheckerVerdict, type DeterministicVerdict, type RuleId } from "@verity/types";
 import type { DisputeResolutionRequest, SettlementOutcome, SettlementCoordinator } from "@verity/settlement";
+import type { BondVerifier } from "./bond.js";
 import { MemoryDisputeStore, type DisputeStore, type StoredDispute } from "./store.js";
 
 export interface ProviderRecord {
@@ -87,6 +88,7 @@ export class DisputeProcessor {
     private readonly content: ContentStore,
     private readonly checkers: readonly CrossChecker[],
     private readonly settlement: Pick<SettlementCoordinator, "recordAdjudication">,
+    private readonly bondVerifier: BondVerifier,
     store: DisputeStore = new MemoryDisputeStore()
   ) {
     if (checkers.length < 3 || checkers.length % 2 === 0) {
@@ -112,6 +114,14 @@ export class DisputeProcessor {
     if (!/^\d+$/.test(provider.providerStakeAmount) || BigInt(provider.providerStakeAmount) <= 0n) {
       throw new DisputeInputError(`VERITY_PROVIDER_STAKE_INVALID: ${submission.providerId} has an invalid stake amount`);
     }
+    if (!isEvmAddress(provider.providerAddress)) throw new DisputeInputError(`VERITY_PROVIDER_ADDRESS_INVALID: ${submission.providerId} has an invalid payout address`);
+    await this.bondVerifier.verify({
+      transactionId: submission.bondTransactionId,
+      disputeId: submission.disputeId,
+      providerRoot: provider.providerRoot,
+      buyerAddress: submission.buyerAddress,
+      amountTinybars: submission.buyerBondAmount
+    });
     const evaluationInput = await this.content.readJson(submission.evaluationInput);
     const buyer = await this.identity.verify(submission.identityProof, submission.identitySignal);
     const eligibility = requireDisputeEligibility(buyer, submission.buyerBondAmount);

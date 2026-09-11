@@ -14,6 +14,8 @@ export interface DisputeServiceConfig {
   readonly disputeStoreDirectory: string;
   readonly worldVerifyUrl: string;
   readonly worldAction: string;
+  readonly mirrorNodeBaseUrl: string;
+  readonly escrowContractId: string;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -40,7 +42,9 @@ export function readDisputeServiceConfig(env: NodeJS.ProcessEnv = process.env): 
     providerRegistryPath: required(env, "VERITY_PROVIDER_REGISTRY_FILE"),
     disputeStoreDirectory: required(env, "DISPUTE_STORE_DIR"),
     worldVerifyUrl: required(env, "WORLD_ID_VERIFY_URL"),
-    worldAction: required(env, "WORLD_ID_DISPUTE_ACTION")
+    worldAction: required(env, "WORLD_ID_DISPUTE_ACTION"),
+    mirrorNodeBaseUrl: required(env, "MIRROR_NODE_BASE_URL"),
+    escrowContractId: required(env, "VERITY_ESCROW_CONTRACT_ID")
   };
 }
 

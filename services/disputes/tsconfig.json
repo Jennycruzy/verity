@@ -9,6 +9,7 @@
   "references": [
     { "path": "../../packages/agent" },
     { "path": "../../packages/content" },
+    { "path": "../../packages/hcs" },
     { "path": "../../services/settlement" },
     { "path": "../../packages/types" }
   ],

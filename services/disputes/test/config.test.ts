@@ -16,7 +16,9 @@ const baseEnv = {
   VERITY_PROVIDER_REGISTRY_FILE: "artifacts/providers.json",
   DISPUTE_STORE_DIR: "artifacts/disputes",
   WORLD_ID_VERIFY_URL: "https://world.invalid/verify",
-  WORLD_ID_DISPUTE_ACTION: "verity-dispute"
+  WORLD_ID_DISPUTE_ACTION: "verity-dispute",
+  MIRROR_NODE_BASE_URL: "https://mirror.invalid/api/v1",
+  VERITY_ESCROW_CONTRACT_ID: "0.0.10"
 };
 
 test("loads checker and dispute service configuration", () => {
