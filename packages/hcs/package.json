@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hiero-ledger/sdk": "2.85.0",
+    "bignumber.js": "11.1.2",
     "@verity/types": "0.1.0"
   },
   "scripts": {

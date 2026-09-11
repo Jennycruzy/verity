@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { ContractExecuteTransaction, ContractFunctionParameters, Hbar, type Client } from "@hiero-ledger/sdk";
+import BigNumber from "bignumber.js";
 
 export interface EscrowCallResult {
   readonly transactionId: string;
@@ -56,10 +57,10 @@ export class VerityEscrowClient {
 
   public lockStake(disputeId: string, amountTinybars: string): Promise<EscrowCallResult> {
     return this.executor.execute(
-      "lockStake",
+        "lockStake",
       new ContractFunctionParameters()
         .addBytes32(toBytes32(disputeId))
-        .addUint256(parseTinybars(amountTinybars))
+        .addUint256(new BigNumber(parseTinybars(amountTinybars)))
     );
   }
 

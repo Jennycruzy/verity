@@ -15,6 +15,7 @@
     "typecheck": "tsc -b",
     "discover": "tsx scripts/discover-capabilities.ts",
     "provision:topics": "tsx scripts/provision-topics.ts",
+    "content:start": "npm --workspace @verity/content-service start",
     "contracts:build": "forge build --offline",
     "contracts:deploy": "tsx scripts/deploy-escrow.ts",
     "measure-hold": "tsx scripts/measure-hold-window.ts",

@@ -92,6 +92,9 @@ export class SettlementCoordinator {
       transactionId = result.transaction;
       state = transition(state, "adjudication_overturned");
     }
+    if (state !== "void" && state !== "settled") {
+      throw new Error(`VERITY_ADJUDICATION_STATE: resolution ended in ${state}`);
+    }
     const record = {
       schema: "verity/hcs/v1" as const,
       kind: "dispute" as const,
