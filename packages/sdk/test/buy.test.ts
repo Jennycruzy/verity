@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
 import { PrivateKey } from "@hiero-ledger/sdk";
 import test from "node:test";
+import { Blocky402Client } from "@verity/hedera";
 import { evaluateFxRate, sha256, type ContentReference } from "@verity/types";
 import { buy } from "../src/buy.ts";
+
+class DiscoveryOnlyFacilitator extends Blocky402Client {
+  public override async supported() {
+    return {
+      kinds: [{ x402Version: 2, scheme: "exact", network: "hedera:testnet", extra: { feePayer: "0.0.999" } }],
+      extensions: [],
+      signers: { "hedera:*": ["0.0.999"] }
+    };
+  }
+}
 
 test("posts a bond before submitting the deterministic dispute payload", async () => {
   process.env.BLOCKY402_URL = "https://facilitator.invalid";
@@ -66,6 +77,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
       calls.push(`bond:${disputeId}:${providerRoot}:${amount}`);
       return { transactionId: "0.0.9@1.000000000" };
     },
+    facilitator: new DiscoveryOnlyFacilitator("https://facilitator.invalid"),
     fetchImpl
   });
   assert.equal(result.verdict.verdict, "reject");

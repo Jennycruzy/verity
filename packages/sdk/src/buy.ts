@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
 import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements, SettleResponse } from "@x402/core/types";
 import { HttpContentStore, type ContentStore } from "@verity/content";
-import { Blocky402Client, readBuyerConfig } from "@verity/hedera";
+import { Blocky402Client, discoverHederaCapability, readBuyerConfig } from "@verity/hedera";
 import { createHederaClient, createVerityEscrowClient } from "@verity/hcs";
 import { evaluateEntity, evaluateFxRate, RULE_IDS, type ContentReference, type DeterministicVerdict, type RuleId } from "@verity/types";
 
@@ -46,6 +46,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   const config = readBuyerConfig();
   const fetchImpl = options.fetchImpl ?? fetch;
   const facilitator = options.facilitator ?? new Blocky402Client(config.facilitatorUrl, { requestTimeoutMs: config.requestTimeoutMs });
+  const capability = await discoverHederaCapability(facilitator, config.network);
   const unpaidResponse = await fetchImpl(url, { method: "GET" });
   if (unpaidResponse.status !== 402) {
     throw new Error(`VERITY_PAYMENT_REQUIRED_EXPECTED: ${url} returned ${unpaidResponse.status} without a payment challenge`);
@@ -53,6 +54,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
 
   const paymentRequired = await parsePaymentRequired(unpaidResponse);
   const requirements = selectRequirements(paymentRequired, config.network, options.maxPrice);
+  assertPaymentCapability(requirements, capability.feePayer);
   const [{ x402Client }, { ExactHederaScheme, PrivateKey, createClientHederaSigner }] = await Promise.all([
     import("@x402/core/client"),
     import("@x402/hedera")
@@ -221,6 +223,13 @@ function selectRequirements(paymentRequired: PaymentRequired, network: string, m
     throw new Error(`VERITY_PRICE_LIMIT: resource asks for ${requirements.amount}, maxPrice is ${maxPrice}`);
   }
   return requirements;
+}
+
+function assertPaymentCapability(requirements: PaymentRequirements, feePayer: string): void {
+  const advertisedFeePayer = requirements.extra?.feePayer;
+  if (typeof advertisedFeePayer !== "string" || advertisedFeePayer !== feePayer) {
+    throw new Error("VERITY_FEE_PAYER_MISMATCH: payment requirements do not match the facilitator capability");
+  }
 }
 
 async function evaluateValue(evaluator: Evaluator, value: unknown, response: Response, requirements: PaymentRequirements): Promise<DeterministicVerdict> {
