@@ -81,6 +81,7 @@ export class DisputeInputError extends Error {
 
 export class DisputeProcessor {
   private readonly store: DisputeStore;
+  private readonly inFlight = new Map<string, { requestHash: string; promise: Promise<DisputeSubmissionResult> }>();
 
   public constructor(
     private readonly identity: DisputeIdentityVerifier,
@@ -108,6 +109,23 @@ export class DisputeProcessor {
       return { created: false, result: existing.result };
     }
 
+    const pending = this.inFlight.get(submission.disputeId);
+    if (pending) {
+      if (pending.requestHash !== requestHash) throw new IdempotencyConflictError(submission.disputeId);
+      const result = await pending.promise;
+      return { created: false, result: result.result };
+    }
+
+    const promise = this.processNewSubmission(submission, requestHash);
+    this.inFlight.set(submission.disputeId, { requestHash, promise });
+    try {
+      return await promise;
+    } finally {
+      if (this.inFlight.get(submission.disputeId)?.promise === promise) this.inFlight.delete(submission.disputeId);
+    }
+  }
+
+  private async processNewSubmission(submission: DisputeSubmission, requestHash: string): Promise<DisputeSubmissionResult> {
     const provider = await this.providers.get(submission.providerId);
     if (!provider) throw new DisputeInputError(`VERITY_PROVIDER_UNKNOWN: no registered provider ${submission.providerId}`);
     if (!provider.providerRoot.trim()) throw new DisputeInputError(`VERITY_PROVIDER_ROOT_MISSING: ${submission.providerId} has no verified root`);

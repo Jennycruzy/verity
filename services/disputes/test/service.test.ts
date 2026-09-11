@@ -86,6 +86,31 @@ test("rejects a conflicting retry and missing providers", async () => {
   await assert.rejects(processor.submit({ ...submissionForTest(), disputeId: "dispute-2", providerId: "missing" }), /VERITY_PROVIDER_UNKNOWN/);
 });
 
+test("runs concurrent identical submissions once", async () => {
+  let settlementCalls = 0;
+  const content: ContentStore = { putJson: async () => ref("{}"), readJson: async () => input };
+  const settlement = {
+    recordAdjudication: async () => {
+      settlementCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { state: "void" as const, hcsTransactionId: "hcs-1" };
+    }
+  };
+  const processor = new DisputeProcessor(
+    { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
+    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]])),
+    content,
+    checkers,
+    settlement,
+    { verify: async () => undefined }
+  );
+  const [first, second] = await Promise.all([processor.submit(submissionForTest()), processor.submit(submissionForTest())]);
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal(settlementCalls, 1);
+  assert.deepEqual(second.result, first.result);
+});
+
 test("requires one provider response reference per checker", async () => {
   const content: ContentStore = { putJson: async () => ref("{}"), readJson: async () => input };
   const settlement = { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "hcs-1" }) };
