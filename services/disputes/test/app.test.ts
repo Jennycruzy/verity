@@ -45,7 +45,7 @@ function processorForTest(): DisputeProcessor {
   const content: ContentStore = { putJson: async () => reference("put"), readJson: async () => ({ expectedRate: "1", actualRate: "2", toleranceBps: 0 }) };
   return new DisputeProcessor(
     { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
-    { get: async () => ({ providerRoot: "provider-root", providerStakeAmount: "20" }) },
+    { get: async () => ({ providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }) },
     content,
     checkers,
     { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "0.0.8@1.000000000" }) }
@@ -63,6 +63,7 @@ function submissionForTest() {
     paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} },
     identityProof: { proof: "opaque" },
     identitySignal: "request-1",
+    buyerAddress: `0x${"02".repeat(20)}`,
     buyerBondAmount: "10",
     bondTransactionId: "0.0.9@1.000000000",
     evaluationInput: reference("input"),

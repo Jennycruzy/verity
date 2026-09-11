@@ -38,6 +38,8 @@ export interface SettlementConfig {
   readonly settlementTopicId: string;
   readonly disputeTopicId: string;
   readonly requestTimeoutMs: number;
+  readonly escrowContractId?: string;
+  readonly escrowGas?: number;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -55,6 +57,14 @@ function positiveInteger(env: NodeJS.ProcessEnv, name: string, fallback: number)
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`VERITY_CONFIG_INVALID: ${name} must be a positive integer`);
   }
+  return value;
+}
+
+function optionalPositiveInteger(env: NodeJS.ProcessEnv, name: string): number | undefined {
+  const raw = env[name]?.trim();
+  if (!raw) return undefined;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`VERITY_CONFIG_INVALID: ${name} must be a positive integer`);
   return value;
 }
 
@@ -103,6 +113,11 @@ export function readBuyerConfig(env: NodeJS.ProcessEnv = process.env): BuyerConf
 }
 
 export function readSettlementConfig(env: NodeJS.ProcessEnv = process.env): SettlementConfig {
+  const escrowContractId = env.VERITY_ESCROW_CONTRACT_ID?.trim();
+  const escrowGas = optionalPositiveInteger(env, "VERITY_ESCROW_GAS");
+  if (Boolean(escrowContractId) !== (escrowGas !== undefined)) {
+    throw new Error("VERITY_CONFIG_INVALID: VERITY_ESCROW_CONTRACT_ID and VERITY_ESCROW_GAS must be set together");
+  }
   return {
     facilitatorUrl: required(env, "BLOCKY402_URL"),
     network: required(env, "HEDERA_NETWORK"),
@@ -111,6 +126,7 @@ export function readSettlementConfig(env: NodeJS.ProcessEnv = process.env): Sett
     operatorPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
     settlementTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
     disputeTopicId: required(env, "HCS_DISPUTE_TOPIC_ID"),
-    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000),
+    ...(escrowContractId && escrowGas !== undefined ? { escrowContractId, escrowGas } : {})
   };
 }

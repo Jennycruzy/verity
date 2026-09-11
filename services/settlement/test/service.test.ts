@@ -62,6 +62,8 @@ function disputeRequest(verdict: "accept" | "reject") {
     verdict: { verdict, ruleId: "fx-rate-v1" as const, reasonCode: verdict === "reject" ? "RATE_OUTSIDE_TOLERANCE" : "RATE_WITHIN_TOLERANCE", evidence: {} },
     buyerBondAmount: "10",
     providerStakeAmount: "20",
+    buyerAddress: `0x${"01".repeat(20)}`,
+    providerAddress: `0x${"02".repeat(20)}`,
     evaluationInput: { sha256: "input-hash", mediaType: "application/json", byteLength: 42, uri: "https://content.invalid/input" },
     buyerResponse: { sha256: "buyer-hash", mediaType: "application/json", byteLength: 42, uri: "https://content.invalid/buyer" },
     providerResponses: [{ sha256: "provider-hash", mediaType: "application/json", byteLength: 42, uri: "https://content.invalid/provider" }],
@@ -76,12 +78,13 @@ test("records a complete upheld dispute without settling the held payment", asyn
   const coordinator = new SettlementCoordinator(
     new FacilitatorForTest("https://facilitator.invalid"),
     { publish: async (_topic, record) => { published.push(record); return "0.0.8@3.000000000"; } },
-    { settlement: "0.0.7", dispute: "0.0.8" }
+    { settlement: "0.0.7", dispute: "0.0.8" },
+    escrowForTest()
   );
   const result = await coordinator.recordAdjudication(disputeRequest("reject"));
   assert.equal(result.state, "void");
   assert.equal(result.transactionId, undefined);
-  assert.deepEqual((published[0] as { payload: { evaluationInput: unknown; resolution: string } }).payload.evaluationInput, disputeRequest("reject").evaluationInput);
+  assert.deepEqual((published[0] as { payload: { evaluationInput: unknown; resolution: string } }).payload.evaluationInput, { sha256: "input-hash", mediaType: "application/json", byteLength: 42 });
   assert.equal((published[0] as { payload: { resolution: string } }).payload.resolution, "void");
 });
 
@@ -90,10 +93,19 @@ test("settles and records an overturned dispute", async () => {
   const coordinator = new SettlementCoordinator(
     new FacilitatorForTest("https://facilitator.invalid"),
     { publish: async (_topic, record) => { published.push(record); return "0.0.8@4.000000000"; } },
-    { settlement: "0.0.7", dispute: "0.0.8" }
+    { settlement: "0.0.7", dispute: "0.0.8" },
+    escrowForTest()
   );
   const result = await coordinator.recordAdjudication(disputeRequest("accept"));
   assert.equal(result.state, "settled");
   assert.equal(result.transactionId, "0.0.99@1.000000000");
   assert.equal((published[0] as { payload: { resolutionTransactionId: string } }).payload.resolutionTransactionId, "0.0.99@1.000000000");
 });
+
+function escrowForTest() {
+  return {
+    async lockStake() { return { transactionId: "0.0.10@1.000000000" }; },
+    async resolveBond() { return { transactionId: "0.0.10@2.000000000" }; },
+    async anchorReputation() { return { transactionId: "0.0.10@3.000000000" }; }
+  };
+}

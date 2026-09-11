@@ -17,6 +17,7 @@ export interface BuyOptions {
   readonly disputeId?: string;
   readonly providerId?: string;
   readonly buyerId?: string;
+  readonly buyerAddress?: string;
   readonly providerRoot?: string;
   readonly identityProof?: Readonly<Record<string, unknown>>;
   readonly identitySignal?: string;
@@ -94,6 +95,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
 
   const providerId = requiredOption(options.providerId, "VERITY_PROVIDER_ID_MISSING: configure providerId for a bonded rejection");
   const buyerId = requiredOption(options.buyerId, "VERITY_BUYER_ID_MISSING: configure buyerId for a bonded rejection");
+  const buyerAddress = requiredOption(options.buyerAddress ?? process.env.HEDERA_CLIENT_EVM_ADDRESS, "VERITY_BUYER_ADDRESS_MISSING: configure the buyer EVM address for escrow resolution");
   const providerRoot = requiredOption(options.providerRoot, "VERITY_PROVIDER_ROOT_MISSING: configure providerRoot before posting a bond");
   const identityProof = options.identityProof;
   if (!identityProof) throw new Error("VERITY_IDENTITY_PROOF_MISSING: provide a verified World ID proof before rejecting a response");
@@ -125,6 +127,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
       requestId,
       providerId,
       buyerId,
+      buyerAddress,
       ruleId: verdict.ruleId,
       paymentPayload,
       paymentRequirements: requirements,

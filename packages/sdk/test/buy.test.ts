@@ -47,6 +47,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     disputeUrl: "https://dispute.invalid/disputes",
     providerId: "provider-1",
     buyerId: "buyer-1",
+    buyerAddress: `0x${"03".repeat(20)}`,
     providerRoot: "provider-root",
     identityProof: { proof: "opaque" },
     identitySignal: "request-1",

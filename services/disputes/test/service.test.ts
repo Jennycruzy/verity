@@ -25,7 +25,7 @@ test("adjudicates a bonded rejection and records the complete result", async () 
       return { state: "void" as const, hcsTransactionId: "0.0.8@1.000000000" };
     }
   };
-  const provider = new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20" }]]));
+  const provider = new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]]));
   const processor = new DisputeProcessor(
     { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
     provider,
@@ -51,7 +51,7 @@ test("rejects a conflicting retry and missing providers", async () => {
   const settlement = { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "hcs-1" }) };
   const processor = new DisputeProcessor(
     { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
-    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20" }]])),
+    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]])),
     content,
     checkers,
     settlement,
@@ -87,6 +87,7 @@ function submissionForTest(): DisputeSubmission {
     paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} },
     identityProof: { proof: "opaque" },
     identitySignal: "request-1",
+    buyerAddress: `0x${"02".repeat(20)}`,
     buyerBondAmount: "10",
     bondTransactionId: "0.0.9@1.000000000",
     evaluationInput: ref(serialized),

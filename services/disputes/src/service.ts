@@ -8,6 +8,7 @@ import { MemoryDisputeStore, type DisputeStore, type StoredDispute } from "./sto
 export interface ProviderRecord {
   readonly providerRoot: string;
   readonly providerStakeAmount: string;
+  readonly providerAddress: string;
 }
 
 export interface ProviderRegistry {
@@ -36,6 +37,7 @@ export interface DisputeSubmission {
   readonly paymentRequirements: PaymentRequirements;
   readonly identityProof: WorldIdProof;
   readonly identitySignal: string;
+  readonly buyerAddress: string;
   readonly buyerBondAmount: string;
   readonly bondTransactionId: string;
   readonly evaluationInput: ContentReference;
@@ -129,6 +131,8 @@ export class DisputeProcessor {
       buyerBondAmount: eligibility.bondAmount,
       bondTransactionId: submission.bondTransactionId,
       providerStakeAmount: provider.providerStakeAmount,
+      buyerAddress: submission.buyerAddress,
+      providerAddress: provider.providerAddress,
       evaluationInput: submission.evaluationInput,
       buyerResponse: submission.buyerResponse,
       providerResponses: submission.providerResponses,
@@ -167,6 +171,7 @@ function validateSubmission(value: DisputeSubmission, checkerCount: number): voi
   if (!value.disputeId.trim() || !value.requestId.trim() || !value.providerId.trim() || !value.buyerId.trim()) {
     throw new DisputeInputError("VERITY_DISPUTE_FIELDS_REQUIRED: disputeId, requestId, providerId, and buyerId are required");
   }
+  if (!isEvmAddress(value.buyerAddress)) throw new DisputeInputError("VERITY_BUYER_ADDRESS_INVALID: provide a 20-byte EVM address");
   if (!Object.values(RULE_IDS).includes(value.ruleId)) throw new DisputeInputError(`VERITY_RULE_UNKNOWN: ${value.ruleId}`);
   if (!/^\d+$/.test(value.buyerBondAmount) || BigInt(value.buyerBondAmount) <= 0n) {
     throw new DisputeInputError("VERITY_NO_BOND: buyerBondAmount must be a positive integer");
@@ -199,6 +204,7 @@ export function isDisputeSubmission(value: unknown): value is DisputeSubmission 
     && isRecord(candidate.paymentRequirements)
     && isRecord(candidate.identityProof)
     && typeof candidate.identitySignal === "string"
+    && typeof candidate.buyerAddress === "string"
     && typeof candidate.buyerBondAmount === "string"
     && typeof candidate.bondTransactionId === "string"
     && isContentReference(candidate.evaluationInput)
@@ -211,6 +217,10 @@ function isContentReference(value: unknown): value is ContentReference {
   if (!isRecord(value)) return false;
   return typeof value.sha256 === "string" && typeof value.mediaType === "string" && typeof value.byteLength === "number"
     && (value.uri === undefined || typeof value.uri === "string");
+}
+
+function isEvmAddress(value: string): boolean {
+  return /^0x[0-9a-fA-F]{40}$/.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

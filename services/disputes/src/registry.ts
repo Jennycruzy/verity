@@ -13,15 +13,16 @@ export async function readProviderRegistry(path: string): Promise<MemoryProvider
   const records = new Map<string, ProviderRecord>();
   for (const [index, entry] of value.entries()) {
     if (!entry || typeof entry !== "object") throw new Error(`VERITY_PROVIDER_REGISTRY_SCHEMA: entry ${index} is not an object`);
-    const candidate = entry as { providerId?: unknown; providerRoot?: unknown; providerStakeAmount?: unknown };
+    const candidate = entry as { providerId?: unknown; providerRoot?: unknown; providerStakeAmount?: unknown; providerAddress?: unknown };
     if (typeof candidate.providerId !== "string" || !candidate.providerId.trim()
       || typeof candidate.providerRoot !== "string" || !candidate.providerRoot.trim()
       || typeof candidate.providerStakeAmount !== "string" || !/^\d+$/.test(candidate.providerStakeAmount)
-      || BigInt(candidate.providerStakeAmount) <= 0n) {
+      || BigInt(candidate.providerStakeAmount) <= 0n
+      || typeof candidate.providerAddress !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(candidate.providerAddress)) {
       throw new Error(`VERITY_PROVIDER_REGISTRY_SCHEMA: entry ${index} is invalid`);
     }
     if (records.has(candidate.providerId)) throw new Error(`VERITY_PROVIDER_REGISTRY_SCHEMA: duplicate provider ${candidate.providerId}`);
-    records.set(candidate.providerId, { providerRoot: candidate.providerRoot, providerStakeAmount: candidate.providerStakeAmount });
+    records.set(candidate.providerId, { providerRoot: candidate.providerRoot, providerStakeAmount: candidate.providerStakeAmount, providerAddress: candidate.providerAddress });
   }
   return new MemoryProviderRegistry(records);
 }
