@@ -37,6 +37,15 @@ export function hashWorldSignal(signal: string): string {
   return `0x${(value >> 8n).toString(16).padStart(64, "0")}`;
 }
 
+export function normalizeWorldRoot(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned an empty durable root");
+  if (!/^0x[0-9a-f]+$/i.test(normalized)) return normalized;
+  const decimal = BigInt(normalized).toString(10);
+  if (decimal === "0") throw new Error("VERITY_WORLD_ID_ROOT_INVALID: verifier returned a zero root");
+  return decimal;
+}
+
 export class WorldIdVerifier {
   public constructor(
     private readonly config: WorldIdVerifierConfig,
@@ -65,8 +74,9 @@ export class WorldIdVerifier {
     if (body.action !== this.config.action) {
       throw new Error(`VERITY_WORLD_ID_ACTION_MISMATCH: expected ${this.config.action}, received ${body.action}`);
     }
-    const root = body.nullifier ?? body.nullifierHash ?? body.sessionId ?? body.session_id;
-    if (!root) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
+    const rootValue = body.nullifier ?? body.nullifierHash ?? body.sessionId ?? body.session_id;
+    if (!rootValue) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
+    const root = normalizeWorldRoot(rootValue);
     if (await this.roots.has(this.config.action, root)) {
       throw new Error("VERITY_WORLD_ID_REPLAY: this root has already been used for the configured action");
     }

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { adjudicate } from "../src/adjudication.ts";
 import { requireDisputeEligibility } from "../src/dispute.ts";
-import { FileRootStore, hashWorldSignal, MemoryRootStore, WorldIdVerifier } from "../src/identity.ts";
+import { FileRootStore, hashWorldSignal, MemoryRootStore, normalizeWorldRoot, WorldIdVerifier } from "../src/identity.ts";
 
 test("majority adjudication is deterministic and rule-bound", async () => {
   const result = await adjudicate(
@@ -29,6 +29,12 @@ test("hashWorldSignal matches the World ID reference vector", () => {
     hashWorldSignal("test_signal"),
     "0x00c1636e0a961a3045054c4d61374422c31a95846b8442f0927ad2ff1d6112ed"
   );
+});
+
+test("normalizes equivalent hexadecimal roots to one durable key", () => {
+  assert.equal(normalizeWorldRoot("0x000A"), "10");
+  assert.equal(normalizeWorldRoot("0x0a"), "10");
+  assert.throws(() => normalizeWorldRoot("0x0"), /VERITY_WORLD_ID_ROOT_INVALID/);
 });
 
 test("World ID verifier stores a root before returning eligibility", async () => {
