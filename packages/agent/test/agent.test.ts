@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { adjudicate } from "../src/adjudication.ts";
 import { requireDisputeEligibility } from "../src/dispute.ts";
-import { FileRootStore, MemoryRootStore, WorldIdVerifier } from "../src/identity.ts";
+import { FileRootStore, hashWorldSignal, MemoryRootStore, WorldIdVerifier } from "../src/identity.ts";
 
 test("majority adjudication is deterministic and rule-bound", async () => {
   const result = await adjudicate(
@@ -24,6 +24,13 @@ test("disputes require both a verified root and a bond", () => {
   assert.throws(() => requireDisputeEligibility({ root: "root", action: "action", verifiedAt: "now", provider: "world-id" }, undefined), /VERITY_NO_BOND/);
 });
 
+test("hashWorldSignal matches the World ID reference vector", () => {
+  assert.equal(
+    hashWorldSignal("test_signal"),
+    "0x00c1636e0a961a3045054c4d61374422c31a95846b8442f0927ad2ff1d6112ed"
+  );
+});
+
 test("World ID verifier stores a root before returning eligibility", async () => {
   const roots = new MemoryRootStore();
   const verifier = new WorldIdVerifier(
@@ -31,9 +38,10 @@ test("World ID verifier stores a root before returning eligibility", async () =>
     roots,
     async () => new Response(JSON.stringify({ success: true, action: "register-provider", nullifier: "root-1" }), { status: 200 })
   );
-  const verified = await verifier.verify({ proof: "opaque" }, "provider-account");
+  const proof = { proof: "opaque", signal_hash: hashWorldSignal("provider-account") };
+  const verified = await verifier.verify(proof, "provider-account");
   assert.equal(verified.root, "root-1");
-  await assert.rejects(verifier.verify({ proof: "opaque" }, "provider-account"), /VERITY_WORLD_ID_REPLAY/);
+  await assert.rejects(verifier.verify(proof, "provider-account"), /VERITY_WORLD_ID_REPLAY/);
 });
 
 test("World ID verifier rejects a proof verified for another action", async () => {
@@ -42,7 +50,22 @@ test("World ID verifier rejects a proof verified for another action", async () =
     new MemoryRootStore(),
     async () => new Response(JSON.stringify({ success: true, action: "dispute", nullifier: "root-1" }), { status: 200 })
   );
-  await assert.rejects(verifier.verify({ proof: "opaque" }, "provider-account"), /VERITY_WORLD_ID_ACTION_MISMATCH/);
+  await assert.rejects(
+    verifier.verify({ proof: "opaque", signal_hash: hashWorldSignal("provider-account") }, "provider-account"),
+    /VERITY_WORLD_ID_ACTION_MISMATCH/
+  );
+});
+
+test("World ID verifier rejects a proof bound to another signal", async () => {
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "register-provider", nullifier: "root-1" }), { status: 200 })
+  );
+  await assert.rejects(
+    verifier.verify({ proof: "opaque", signal_hash: hashWorldSignal("other-signal") }, "provider-account"),
+    /VERITY_WORLD_ID_SIGNAL_MISMATCH/
+  );
 });
 
 test("persists verified roots across FileRootStore instances", async () => {

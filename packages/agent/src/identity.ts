@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { keccak_256 } from "@noble/hashes/sha3";
 
 export interface WorldIdProof {
   readonly [key: string]: unknown;
@@ -24,6 +25,18 @@ export interface WorldIdVerifierConfig {
 
 type FetchLike = typeof fetch;
 
+/**
+ * World ID's signal binding is keccak-256 interpreted as a big-endian integer,
+ * shifted right by eight bits and encoded as a 32-byte hex value.
+ */
+export function hashWorldSignal(signal: string): string {
+  if (!signal) throw new Error("VERITY_WORLD_ID_SIGNAL_MISSING: signal must be non-empty");
+  const digest = keccak_256(new TextEncoder().encode(signal));
+  let value = 0n;
+  for (const byte of digest) value = (value << 8n) | BigInt(byte);
+  return `0x${(value >> 8n).toString(16).padStart(64, "0")}`;
+}
+
 export class WorldIdVerifier {
   public constructor(
     private readonly config: WorldIdVerifierConfig,
@@ -33,6 +46,7 @@ export class WorldIdVerifier {
 
   public async verify(proof: WorldIdProof, signal: string): Promise<VerifiedRoot> {
     if (!signal) throw new Error("VERITY_WORLD_ID_SIGNAL_MISSING: proof must bind to a non-empty signal");
+    assertWorldSignalBinding(proof, signal);
     const response = await this.fetchImpl(this.config.verifyUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -124,6 +138,39 @@ function isRootMap(value: unknown): value is Record<string, boolean> {
 
 function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function assertWorldSignalBinding(proof: WorldIdProof, signal: string): void {
+  const claimedHashes = extractWorldSignalHashes(proof);
+  if (claimedHashes.length === 0) {
+    throw new Error("VERITY_WORLD_ID_SIGNAL_UNBOUND: proof contained no signal_hash");
+  }
+  const expectedHash = hashWorldSignal(signal).toLowerCase();
+  if (!claimedHashes.some((hash) => hash.toLowerCase() === expectedHash)) {
+    throw new Error("VERITY_WORLD_ID_SIGNAL_MISMATCH: proof is not bound to the supplied signal");
+  }
+}
+
+function extractWorldSignalHashes(proof: WorldIdProof): string[] {
+  const hashes: string[] = [];
+  appendSignalHash(hashes, proof.signal_hash);
+  appendSignalHash(hashes, proof.signalHash);
+  if (Array.isArray(proof.responses)) {
+    for (const response of proof.responses) {
+      if (!isRecord(response)) continue;
+      appendSignalHash(hashes, response.signal_hash);
+      appendSignalHash(hashes, response.signalHash);
+    }
+  }
+  return hashes;
+}
+
+function appendSignalHash(target: string[], value: unknown): void {
+  if (typeof value === "string" && value.length > 0) target.push(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isVerifiedResponse(value: unknown): value is { action: string; nullifier?: string; nullifierHash?: string; sessionId?: string; session_id?: string; success: boolean } {
