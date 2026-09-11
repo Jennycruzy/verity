@@ -62,8 +62,15 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     required("VERITY_DISPUTE_URL", "dispute", "bonded dispute service URL"),
     required("VERITY_ESCROW_CONTRACT_ID", "dispute", "deployed bond escrow contract ID"),
     required("VERITY_ESCROW_GAS", "dispute", "escrow execution gas limit"),
+    required("HEDERA_PROVIDER_ACCOUNT_ID", "provider", "provider staking account ID"),
+    required("HEDERA_PROVIDER_PRIVATE_KEY", "provider", "provider staking key is set locally; value is never printed"),
+    required("HEDERA_PROVIDER_EVM_ADDRESS", "provider", "provider escrow payout address"),
     required("VERITY_PROVIDER_ID", "provider", "registered provider identity"),
     required("VERITY_PROVIDER_ROOT", "provider", "verified provider human root"),
+    required("VERITY_PROVIDER_STAKE", "provider", "provider stake amount in tinybars"),
+    required("VERITY_PROVIDER_PUBLIC_URL", "provider", "public provider URL for identity registration"),
+    required("VERITY_ERC8004_REGISTRY", "provider", "normalized ERC-8004 registry reference"),
+    required("VERITY_ERC8004_AGENT_ID", "provider", "ERC-8004 agent ID"),
     required("WORLD_ID_VERIFY_URL", "dispute", "World ID verification endpoint"),
     required("WORLD_ID_DISPUTE_ACTION", "dispute", "World ID dispute action")
   ];
@@ -87,6 +94,20 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
       state: "invalid",
       scope: "first-payment",
       detail: "use a distinct provider treasury account from the buyer account"
+    });
+  }
+
+  const identityFields = [
+    env.VERITY_PROVIDER_PUBLIC_URL?.trim(),
+    env.VERITY_ERC8004_REGISTRY?.trim(),
+    env.VERITY_ERC8004_AGENT_ID?.trim()
+  ].filter(Boolean).length;
+  if (identityFields !== 0 && identityFields !== 3) {
+    checks.push({
+      key: "VERITY_PROVIDER_PUBLIC_URL + VERITY_ERC8004_REGISTRY + VERITY_ERC8004_AGENT_ID",
+      state: "invalid",
+      scope: "provider",
+      detail: "set all three identity registration values together"
     });
   }
 
@@ -129,11 +150,13 @@ async function readAccountBalance(mirrorUrl: string, accountId: string): Promise
       return { accountId, state: "unavailable", detail: `Mirror Node returned invalid JSON: ${errorMessage(error)}` };
     }
     if (!isMirrorAccount(body)) return { accountId, state: "unavailable", detail: "Mirror Node response omitted a numeric tinybar balance" };
-    const hbar = (body.balance?.balance ?? 0) / 100_000_000;
+    const tinybar = body.balance?.balance;
+    if (tinybar === undefined) return { accountId, state: "unavailable", detail: "Mirror Node response omitted a numeric tinybar balance" };
+    const hbar = tinybar / 100_000_000;
     return {
       accountId,
       state: "ready",
-      tinybar: body.balance?.balance,
+      tinybar,
       detail: `${hbar.toFixed(8)} HBAR visible on Mirror Node`
     };
   } catch (error) {
@@ -153,6 +176,10 @@ function nextActions(
   const buyer = accounts.find((account) => account.accountId === process.env.HEDERA_CLIENT_ACCOUNT_ID?.trim());
   if (buyer?.state === "ready" && (buyer.tinybar ?? 0) > 0 && !process.env.HEDERA_CLIENT_PRIVATE_KEY?.trim()) {
     actions.push("no extra buyer funding is indicated; set the local buyer signing key before the first payment");
+  }
+  const provider = accounts.find((account) => account.accountId === process.env.HEDERA_PROVIDER_ACCOUNT_ID?.trim());
+  if (provider?.state === "ready" && (provider.tinybar ?? 0) === 0 && process.env.HEDERA_PROVIDER_PRIVATE_KEY?.trim()) {
+    actions.push("fund the provider staking account before npm run stake:provider");
   }
   if (accounts.some((account) => account.state === "ready" && (account.tinybar ?? 0) < 100_000_000)) {
     actions.push("fund any account below 1 HBAR before it signs a transaction");
