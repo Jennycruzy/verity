@@ -26,7 +26,7 @@ Subjective prose quality is outside the product scope.
 | Settlement state and HCS receipts | `services/settlement/src/service.ts` |
 | Independent replay | `packages/replay/` |
 | Graph client and routing | `packages/indexer/` |
-| Public explorer HTTP API | `apps/explorer/` |
+| Public explorer | `apps/explorer/` |
 
 ## SDK quickstart
 
@@ -120,6 +120,8 @@ The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker end
 When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC8004_AGENT_ID` are set, the provider also serves `GET /.well-known/agent-registration.json` with its x402 resource, checker, and registry references.
 
 The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live Graph endpoint and query files configured, `npm run graph:mcp` exposes provider reliability and buyer honesty as MCP tools. The Graph transport requires an x402 challenge and settles the query before returning data.
+
+With the same Graph configuration, start the public explorer with `npm --workspace @verity/explorer start`. Open `http://127.0.0.1:8787/` to query provider reliability or buyer honesty. The browser page and JSON routes both call `GraphReputationClient`; there is no parallel local reputation database.
 
 The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the provider registry, and the Mirror Node URL. For three local FX checker processes, set:
 
