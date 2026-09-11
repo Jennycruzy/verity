@@ -1,0 +1,27 @@
+{
+  "name": "verity",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "tsc -b",
+    "discover": "tsx scripts/discover-capabilities.ts"
+  },
+  "dependencies": {
+    "@x402/core": "2.25.0",
+    "@x402/hedera": "2.25.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
