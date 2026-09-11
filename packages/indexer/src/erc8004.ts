@@ -61,8 +61,9 @@ export function createErc8004Registration(input: {
 
 export function normalizeErc8004Registry(value: string): string {
   const normalized = value.trim().toLowerCase();
-  const [namespace, chainId, identityRegistry] = normalized.split(":");
-  if (!namespace || !chainId || !identityRegistry || !/^[a-z][a-z0-9-]*$/.test(namespace) || !/^\d+$/.test(chainId)) {
+  const segments = normalized.split(":");
+  const [namespace, chainId, identityRegistry] = segments;
+  if (segments.length !== 3 || !namespace || !chainId || !identityRegistry || !/^[a-z][a-z0-9-]*$/.test(namespace) || !/^\d+$/.test(chainId)) {
     throw new Error("VERITY_ERC8004_REGISTRY_INVALID: expected namespace:chainId:identityRegistry");
   }
   return `${namespace}:${BigInt(chainId).toString(10)}:${identityRegistry}`;

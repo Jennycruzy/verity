@@ -26,6 +26,7 @@ test("builds the standard registration file shape", () => {
 
 test("rejects an incomplete standard identity", () => {
   assert.throws(() => normalizeErc8004Registry("eip155:1"), /VERITY_ERC8004_REGISTRY_INVALID/);
+  assert.throws(() => normalizeErc8004Registry("eip155:1:0xregistry:extra"), /VERITY_ERC8004_REGISTRY_INVALID/);
   assert.throws(() => normalizeErc8004AgentId("-1"), /VERITY_ERC8004_AGENT_ID_INVALID/);
   assert.throws(() => createErc8004Registration({
     name: "agent",
