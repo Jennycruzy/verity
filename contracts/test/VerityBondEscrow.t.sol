@@ -116,4 +116,16 @@ contract VerityBondEscrowTest {
         require(providerIncorrect == 1, "provider score missing");
         require(escrow.buyerDishonest(BUYER_ROOT) == 1, "buyer score missing");
     }
+
+    function testAgentRegistrationIsUnique() public {
+        bytes32 agentId = keccak256("agent");
+        bytes32 endpointHash = keccak256("endpoint");
+        escrow.registerAgent(agentId, PROVIDER_ROOT, endpointHash);
+        require(escrow.registeredAgents(agentId), "agent was not registered");
+
+        (bool success,) = address(escrow).call(
+            abi.encodeWithSelector(VerityBondEscrow.registerAgent.selector, agentId, PROVIDER_ROOT, endpointHash)
+        );
+        require(!success, "duplicate agent registration succeeded");
+    }
 }

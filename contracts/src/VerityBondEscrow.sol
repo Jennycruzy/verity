@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 contract VerityBondEscrow {
     error AlreadyResolved(bytes32 disputeId);
+    error AgentAlreadyRegistered(bytes32 agentId);
     error BondAlreadyPosted(bytes32 disputeId);
     error BondNotFound(bytes32 disputeId);
     error DirectTransferDisabled();
@@ -40,6 +41,7 @@ contract VerityBondEscrow {
     mapping(bytes32 => uint256) public totalLockedStake;
     mapping(bytes32 => address) public stakeOwner;
     mapping(bytes32 => Reputation) public reputation;
+    mapping(bytes32 => bool) public registeredAgents;
     mapping(bytes32 => uint64) public buyerHonest;
     mapping(bytes32 => uint64) public buyerDishonest;
 
@@ -73,6 +75,8 @@ contract VerityBondEscrow {
 
     function registerAgent(bytes32 agentId, bytes32 humanRoot, bytes32 endpointHash) external onlyOperator {
         if (agentId == bytes32(0) || humanRoot == bytes32(0) || endpointHash == bytes32(0)) revert InvalidRoot();
+        if (registeredAgents[agentId]) revert AgentAlreadyRegistered(agentId);
+        registeredAgents[agentId] = true;
         emit AgentRegistered(agentId, humanRoot, endpointHash);
     }
 
