@@ -1,4 +1,4 @@
-import { Blocky402Client, type PaymentPayload, type PaymentRequirements, readSettlementConfig } from "@verity/hedera";
+import { Blocky402Client, discoverHederaCapability, type PaymentPayload, type PaymentRequirements, readSettlementConfig } from "@verity/hedera";
 import { createHederaClient, createVerityEscrowClient, HederaHcsPublisher, type EscrowCallResult, type HcsPublisher } from "@verity/hcs";
 import type { ContentReference, CrossCheckerVerdict, DeterministicVerdict, RuleId } from "@verity/types";
 import { transition, type SettlementState } from "./state.js";
@@ -53,6 +53,7 @@ export class SettlementCoordinator {
   ) {}
 
   public async settleAccepted(request: SettlementRequest): Promise<SettlementOutcome> {
+    await this.validatePaymentCapability(request.paymentRequirements);
     let state = transition("created", "verified");
     state = transition(state, "held");
     const result = await this.facilitator.settle(request.paymentPayload, request.paymentRequirements);
@@ -91,6 +92,7 @@ export class SettlementCoordinator {
   }
 
   public async recordAdjudication(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
+    await this.validatePaymentCapability(request.paymentRequirements);
     let state = transition("created", "verified");
     state = transition(state, "held");
     state = transition(state, "adjudication_started");
@@ -198,6 +200,13 @@ export class SettlementCoordinator {
       throw new Error("VERITY_VOID_EXPECTED: recordVoid requires an upheld provider dispute");
     }
     return this.recordAdjudication(request);
+  }
+
+  private async validatePaymentCapability(requirements: PaymentRequirements): Promise<void> {
+    const capability = await discoverHederaCapability(this.facilitator, requirements.network);
+    if (requirements.scheme !== capability.scheme || requirements.network !== capability.network || requirements.extra?.feePayer !== capability.feePayer) {
+      throw new Error("VERITY_FEE_PAYER_MISMATCH: payment requirements do not match the facilitator capability");
+    }
   }
 }
 

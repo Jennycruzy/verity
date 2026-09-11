@@ -5,6 +5,14 @@ import { encodeHcsRecord } from "@verity/hcs";
 import { SettlementCoordinator } from "../src/service.ts";
 
 class FacilitatorForTest extends Blocky402Client {
+  public override async supported() {
+    return {
+      kinds: [{ x402Version: 2, scheme: "exact", network: "hedera:testnet", extra: { feePayer: "0.0.999" } }],
+      extensions: [],
+      signers: { "hedera:*": ["0.0.999"] }
+    };
+  }
+
   public override async settle() {
     return { success: true, transaction: "0.0.99@1.000000000", network: "hedera:testnet", payer: "0.0.98" };
   }
@@ -22,8 +30,8 @@ test("anchors an accepted settlement after the facilitator returns a transaction
     providerId: "provider-1",
     buyerId: "buyer-1",
     ruleId: "fx-rate-v1",
-    paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }, payload: { transaction: "payload" } },
-    paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }
+    paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }, payload: { transaction: "payload" } },
+    paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }
   });
   assert.equal(result.state, "settled");
   assert.equal(result.transactionId, "0.0.99@1.000000000");
@@ -42,8 +50,8 @@ test("reports the Hedera transaction when HCS anchoring fails", async () => {
       providerId: "provider-1",
       buyerId: "buyer-1",
       ruleId: "fx-rate-v1",
-      paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }, payload: { transaction: "payload" } },
-      paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }
+      paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }, payload: { transaction: "payload" } },
+      paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }
     }),
     /VERITY_SETTLEMENT_ANCHOR_FAILED: payment 0\.0\.99@1\.000000000 succeeded/
   );
@@ -55,8 +63,8 @@ function disputeRequest(verdict: "accept" | "reject") {
     providerId: "provider-1",
     buyerId: "buyer-1",
     ruleId: "fx-rate-v1" as const,
-    paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }, payload: { transaction: "payload" } },
-    paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} },
+    paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }, payload: { transaction: "payload" } },
+    paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } },
     disputeId: "dispute-1",
     buyerRoot: "buyer-root",
     providerRoot: "provider-root",
