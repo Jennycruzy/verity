@@ -1,5 +1,5 @@
 import { Interface } from "ethers";
-import { toBytes32 } from "@verity/hcs";
+import { normalizeMirrorNodeBaseUrl, toBytes32 } from "@verity/hcs";
 
 export interface BondVerificationInput {
   readonly transactionId: string;
@@ -31,8 +31,7 @@ export class MirrorBondVerifier implements BondVerifier {
     private readonly escrowContractId: string,
     private readonly fetchImpl: typeof fetch = fetch
   ) {
-    const normalized = mirrorNodeBaseUrl.trim().replace(/\/$/, "");
-    if (!normalized) throw new Error("VERITY_MIRROR_URL_EMPTY: set MIRROR_NODE_BASE_URL");
+    const normalized = normalizeMirrorNodeBaseUrl(mirrorNodeBaseUrl);
     if (!escrowContractId.trim()) throw new Error("VERITY_ESCROW_CONTRACT_ID_MISSING: set the deployed escrow contract ID");
     this.baseUrl = normalized;
   }

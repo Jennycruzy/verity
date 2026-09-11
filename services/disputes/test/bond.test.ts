@@ -31,6 +31,14 @@ test("normalizes the Hedera transaction ID accepted by Mirror Node", () => {
   assert.throws(() => toMirrorTransactionId("not-a-transaction"), /VERITY_BOND_TRANSACTION_ID_INVALID/);
 });
 
+test("adds the Mirror Node API path when the root URL is configured", async () => {
+  const verifier = new MirrorBondVerifier("https://mirror.invalid", contractId, async (input) => {
+    assert.equal(String(input), "https://mirror.invalid/api/v1/contracts/results/0.0.9-1-000000000");
+    return new Response(JSON.stringify({ contract_id: contractId, from: buyerAddress, amount: "10", function_parameters: "0x", result: "SUCCESS" }), { status: 200 });
+  });
+  await assert.rejects(verifier.verify({ transactionId: "0.0.9@1.000000000", disputeId: "dispute-1", providerRoot, buyerAddress, amountTinybars: "10" }), /VERITY_BOND_FUNCTION_MISMATCH/);
+});
+
 function bytes32(value: string): string {
   return `0x${Buffer.from(toBytes32(value)).toString("hex")}`;
 }

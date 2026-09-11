@@ -23,7 +23,7 @@ export async function readTopicRecords(
   }
   const fetchImpl = options.fetchImpl ?? fetch;
   const records: HcsRecord[] = [];
-  let nextUrl: string | null = `${trimTrailingSlash(mirrorNodeBaseUrl)}/api/v1/topics/${encodeURIComponent(topicId)}/messages`;
+  let nextUrl: string | null = `${normalizeMirrorNodeBaseUrl(mirrorNodeBaseUrl)}/topics/${encodeURIComponent(topicId)}/messages`;
 
   while (nextUrl) {
     const response = await fetchImpl(nextUrl);
@@ -50,10 +50,11 @@ export async function readTopicRecords(
   return records;
 }
 
-function trimTrailingSlash(value: string): string {
+export function normalizeMirrorNodeBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error("VERITY_MIRROR_URL_EMPTY: set MIRROR_NODE_BASE_URL");
-  return trimmed.replace(/\/$/, "");
+  const withoutTrailingSlash = trimmed.replace(/\/$/, "");
+  return withoutTrailingSlash.endsWith("/api/v1") ? withoutTrailingSlash : `${withoutTrailingSlash}/api/v1`;
 }
 
 function isMirrorPage(value: unknown): value is MirrorPage {
