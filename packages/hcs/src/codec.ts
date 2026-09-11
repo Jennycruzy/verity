@@ -3,7 +3,7 @@ import { assertCompactMessage, stableJson } from "@verity/types";
 export const HCS_MESSAGE_MAX_BYTES = 1024;
 export const HCS_SCHEMA = "verity/hcs/v1";
 
-export type HcsRecordKind = "settlement" | "dispute" | "verdict" | "bond";
+export type HcsRecordKind = "settlement" | "dispute" | "verdict" | "bond" | "provider";
 
 export interface HcsRecord<TPayload extends Record<string, unknown> = Record<string, unknown>> {
   readonly schema: typeof HCS_SCHEMA;
@@ -43,7 +43,7 @@ function isHcsRecord(value: unknown): value is HcsRecord {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<HcsRecord>;
   return candidate.schema === HCS_SCHEMA
-    && (candidate.kind === "settlement" || candidate.kind === "dispute" || candidate.kind === "verdict" || candidate.kind === "bond")
+    && (candidate.kind === "settlement" || candidate.kind === "dispute" || candidate.kind === "verdict" || candidate.kind === "bond" || candidate.kind === "provider")
     && typeof candidate.id === "string"
     && typeof candidate.recordedAt === "string"
     && typeof candidate.payload === "object"
