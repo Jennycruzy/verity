@@ -46,6 +46,13 @@ test("checker endpoint rejects an unsupported rule before evaluation", async () 
   assert.match(response.body(), /checker_rule_unsupported/);
 });
 
+test("checker endpoint returns a bounded error for oversized input", async () => {
+  const response = responseForTest();
+  await createProviderHandler(config)(requestForTest("POST", "/check", "x".repeat(65_537)), response.response);
+  assert.equal(response.response.statusCode, 413);
+  assert.match(response.body(), /VERITY_CHECKER_BODY_TOO_LARGE/);
+});
+
 function requestForTest(method: string, url: string, body: string) {
   const request = Readable.from([Buffer.from(body)]) as Readable & { method: string; url: string; headers: Record<string, string> };
   request.method = method;

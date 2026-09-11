@@ -12,33 +12,40 @@ export function createProviderHandler(config: ProviderServiceConfig) {
   let protectedHandler: ReturnType<typeof protect> | undefined;
 
   return async (request: IncomingMessage, response: ServerResponse) => {
-    if (request.url === "/health") {
-      writeJson(response, 200, { status: "ok", provider: config.kind });
-      return;
-    }
-    if (request.method === "POST" && request.url?.split("?", 1)[0] === "/check") {
-      await handleCheck(request, response, config);
-      return;
-    }
-    if (request.method !== "GET") {
-      writeJson(response, 405, { error: "method_not_allowed" });
-      return;
-    }
     const path = request.url?.split("?", 1)[0] ?? "/";
-    const expectedPath = config.kind === "fx" ? "/fx" : "/entity";
-    if (path !== expectedPath) {
-      writeJson(response, 404, { error: "not_found" });
-      return;
+    try {
+      if (path === "/health") {
+        writeJson(response, 200, { status: "ok", provider: config.kind });
+        return;
+      }
+      if (request.method === "POST" && path === "/check") {
+        await handleCheck(request, response, config);
+        return;
+      }
+      if (request.method !== "GET") {
+        writeJson(response, 405, { error: "method_not_allowed" });
+        return;
+      }
+      const expectedPath = config.kind === "fx" ? "/fx" : "/entity";
+      if (path !== expectedPath) {
+        writeJson(response, 404, { error: "not_found" });
+        return;
+      }
+      protectedHandler ??= protect(protectedApplication, {
+        price: config.kind === "fx" ? config.fxPrice : (request) => entityPrice(config, request),
+        verifier: config.kind === "fx" ? "fx-rate-v1" : "entity-canonical-v1",
+        description: config.kind === "fx" ? "Verity FX rate lookup" : "Verity entity resolution lookup"
+      });
+      await protectedHandler(
+        { method: request.method ?? "GET", url: request.url ?? "/", headers: request.headers },
+        response
+      );
+    } catch (error) {
+      if (response.writableEnded) return;
+      writeJson(response, error instanceof CheckerBodyTooLargeError ? 413 : 502, {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
-    protectedHandler ??= protect(protectedApplication, {
-      price: config.kind === "fx" ? config.fxPrice : (request) => entityPrice(config, request),
-      verifier: config.kind === "fx" ? "fx-rate-v1" : "entity-canonical-v1",
-      description: config.kind === "fx" ? "Verity FX rate lookup" : "Verity entity resolution lookup"
-    });
-    await protectedHandler(
-      { method: request.method ?? "GET", url: request.url ?? "/", headers: request.headers },
-      response
-    );
   };
 }
 
@@ -47,7 +54,7 @@ async function handleCheck(request: IncomingMessage, response: ServerResponse, c
   let value: unknown;
   try {
     value = JSON.parse(body);
-  } catch (error) {
+  } catch {
     writeJson(response, 400, { error: "checker_json_invalid" });
     return;
   }
@@ -135,7 +142,7 @@ async function readBody(request: IncomingMessage, maxBytes: number): Promise<str
   for await (const chunk of request) {
     const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += value.byteLength;
-    if (total > maxBytes) throw new Error(`VERITY_CHECKER_BODY_TOO_LARGE: request exceeds ${maxBytes} bytes`);
+    if (total > maxBytes) throw new CheckerBodyTooLargeError(maxBytes);
     chunks.push(value);
   }
   return Buffer.concat(chunks, total).toString("utf8");
@@ -157,6 +164,13 @@ function requiredInteger(value: unknown, name: string): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+class CheckerBodyTooLargeError extends Error {
+  public constructor(maxBytes: number) {
+    super(`VERITY_CHECKER_BODY_TOO_LARGE: request exceeds ${maxBytes} bytes`);
+    this.name = "CheckerBodyTooLargeError";
+  }
 }
 
 export function startProvider(config: ProviderServiceConfig): ReturnType<typeof createServer> {
