@@ -1,6 +1,6 @@
 import { Blocky402Client, discoverHederaCapability, type PaymentPayload, type PaymentRequirements, readSettlementConfig } from "@verity/hedera";
 import { createHederaClient, createVerityEscrowClient, HederaHcsPublisher, type EscrowCallResult, type HcsPublisher } from "@verity/hcs";
-import type { ContentReference, CrossCheckerVerdict, DeterministicVerdict, RuleId } from "@verity/types";
+import { sha256, stableJson, type ContentReference, type CrossCheckerVerdict, type DeterministicVerdict, type RuleId } from "@verity/types";
 import { transition, type SettlementState } from "./state.js";
 
 export interface SettlementRequest {
@@ -44,7 +44,22 @@ export interface SettlementOutcome {
   readonly hcsTransactionIds?: readonly string[];
 }
 
+export class SettlementIdempotencyConflictError extends Error {
+  public constructor(key: string) {
+    super(`VERITY_SETTLEMENT_IDEMPOTENCY_CONFLICT: ${key} already has a different request`);
+    this.name = "SettlementIdempotencyConflictError";
+  }
+}
+
+interface PendingSettlement<T> {
+  readonly requestHash: string;
+  readonly promise: Promise<T>;
+}
+
 export class SettlementCoordinator {
+  private readonly accepted = new Map<string, PendingSettlement<SettlementOutcome>>();
+  private readonly adjudications = new Map<string, PendingSettlement<SettlementOutcome>>();
+
   public constructor(
     private readonly facilitator: Blocky402Client,
     private readonly hcs: HcsPublisher,
@@ -52,7 +67,15 @@ export class SettlementCoordinator {
     private readonly escrow?: EscrowSettlementClient
   ) {}
 
-  public async settleAccepted(request: SettlementRequest): Promise<SettlementOutcome> {
+  public settleAccepted(request: SettlementRequest): Promise<SettlementOutcome> {
+    return this.runIdempotently(this.accepted, request.requestId, request, () => this.settleAcceptedInternal(request));
+  }
+
+  public recordAdjudication(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
+    return this.runIdempotently(this.adjudications, request.disputeId, request, () => this.recordAdjudicationInternal(request));
+  }
+
+  private async settleAcceptedInternal(request: SettlementRequest): Promise<SettlementOutcome> {
     await this.validatePaymentCapability(request.paymentRequirements);
     let state = transition("created", "verified");
     state = transition(state, "held");
@@ -91,7 +114,7 @@ export class SettlementCoordinator {
     return { state, transactionId: result.transaction, hcsTransactionId };
   }
 
-  public async recordAdjudication(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
+  private async recordAdjudicationInternal(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
     await this.validatePaymentCapability(request.paymentRequirements);
     let state = transition("created", "verified");
     state = transition(state, "held");
@@ -207,6 +230,24 @@ export class SettlementCoordinator {
     if (requirements.scheme !== capability.scheme || requirements.network !== capability.network || requirements.extra?.feePayer !== capability.feePayer) {
       throw new Error("VERITY_FEE_PAYER_MISMATCH: payment requirements do not match the facilitator capability");
     }
+  }
+
+  private runIdempotently<T>(
+    operations: Map<string, PendingSettlement<T>>,
+    key: string,
+    request: unknown,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    if (!key.trim()) throw new Error("VERITY_SETTLEMENT_IDEMPOTENCY_KEY_MISSING: request key must be non-empty");
+    const requestHash = sha256(stableJson(request));
+    const existing = operations.get(key);
+    if (existing) {
+      if (existing.requestHash !== requestHash) throw new SettlementIdempotencyConflictError(key);
+      return existing.promise;
+    }
+    const promise = operation();
+    operations.set(key, { requestHash, promise });
+    return promise;
   }
 }
 

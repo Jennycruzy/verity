@@ -5,6 +5,8 @@ import { encodeHcsRecord } from "@verity/hcs";
 import { SettlementCoordinator } from "../src/service.ts";
 
 class FacilitatorForTest extends Blocky402Client {
+  public settleCalls = 0;
+
   public override async supported() {
     return {
       kinds: [{ x402Version: 2, scheme: "exact", network: "hedera:testnet", extra: { feePayer: "0.0.999" } }],
@@ -14,6 +16,7 @@ class FacilitatorForTest extends Blocky402Client {
   }
 
   public override async settle() {
+    this.settleCalls += 1;
     return { success: true, transaction: "0.0.99@1.000000000", network: "hedera:testnet", payer: "0.0.98" };
   }
 }
@@ -57,6 +60,37 @@ test("reports the Hedera transaction when HCS anchoring fails", async () => {
   );
 });
 
+test("coalesces concurrent accepted settlements for one request", async () => {
+  const facilitator = new FacilitatorForTest("https://facilitator.invalid");
+  const published: unknown[] = [];
+  const coordinator = new SettlementCoordinator(
+    facilitator,
+    { publish: async (_topic, record) => { published.push(record); return "0.0.7@2.000000000"; } },
+    { settlement: "0.0.7", dispute: "0.0.8" }
+  );
+  const request = acceptedRequest("request-idempotent");
+  const [first, second] = await Promise.all([coordinator.settleAccepted(request), coordinator.settleAccepted(request)]);
+  assert.deepEqual(second, first);
+  assert.equal(facilitator.settleCalls, 1);
+  assert.equal(published.length, 1);
+});
+
+test("rejects a changed retry for an already settled request", async () => {
+  const facilitator = new FacilitatorForTest("https://facilitator.invalid");
+  const coordinator = new SettlementCoordinator(
+    facilitator,
+    { publish: async () => "0.0.7@2.000000000" },
+    { settlement: "0.0.7", dispute: "0.0.8" }
+  );
+  const request = acceptedRequest("request-conflict");
+  await coordinator.settleAccepted(request);
+  assert.throws(
+    () => coordinator.settleAccepted({ ...request, paymentRequirements: { ...request.paymentRequirements, amount: "2" } }),
+    /VERITY_SETTLEMENT_IDEMPOTENCY_CONFLICT/
+  );
+  assert.equal(facilitator.settleCalls, 1);
+});
+
 function disputeRequest(verdict: "accept" | "reject") {
   return {
     requestId: "request-dispute",
@@ -79,6 +113,17 @@ function disputeRequest(verdict: "accept" | "reject") {
     crossCheckerVerdicts: [
       { checkerId: "checker-a", ruleId: "fx-rate-v1" as const, verdict, reasonCode: "RATE_CHECK" }
     ]
+  };
+}
+
+function acceptedRequest(requestId: string) {
+  return {
+    requestId,
+    providerId: "provider-1",
+    buyerId: "buyer-1",
+    ruleId: "fx-rate-v1" as const,
+    paymentPayload: { x402Version: 2, accepted: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }, payload: { transaction: requestId } },
+    paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }
   };
 }
 
