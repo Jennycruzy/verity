@@ -1,3 +1,7 @@
+import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
+import type { Network, PaymentRequired, PaymentRequirements } from "@x402/core/types";
+import { Blocky402Client, discoverHederaCapability } from "@verity/hedera";
+
 export interface ProviderReputation {
   readonly agentId: string;
   readonly endpoint: string;
@@ -23,12 +27,17 @@ export interface ReputationClient {
 
 type FetchLike = typeof fetch;
 
+export interface GraphQueryTransport {
+  request(input: string, init: RequestInit): Promise<Response>;
+}
+
 export class GraphReputationClient implements ReputationClient {
   public constructor(
     private readonly endpoint: string,
     private readonly queries: { provider: ReputationQuery; buyer: ReputationQuery },
     private readonly fetchImpl: FetchLike = fetch,
-    private readonly apiKey?: string
+    private readonly apiKey?: string,
+    private readonly transport?: GraphQueryTransport
   ) {}
 
   public async provider(agentId: string): Promise<ProviderReputation> {
@@ -42,14 +51,15 @@ export class GraphReputationClient implements ReputationClient {
   }
 
   private async execute(query: ReputationQuery, variables: Readonly<Record<string, unknown>>): Promise<unknown> {
-    const response = await this.fetchImpl(this.endpoint, {
+    const init: RequestInit = {
       method: "POST",
       headers: {
         "content-type": "application/json",
         ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {})
       },
       body: JSON.stringify({ query: query.query, variables: { ...query.variables, ...variables } })
-    });
+    };
+    const response = await (this.transport ? this.transport.request(this.endpoint, init) : this.fetchImpl(this.endpoint, init));
     const raw = await response.text();
     let value: unknown;
     try {
@@ -63,6 +73,97 @@ export class GraphReputationClient implements ReputationClient {
     if (Array.isArray(errors) && errors.length > 0) throw new Error(`VERITY_GRAPH_QUERY: ${JSON.stringify(errors)}`);
     return (value as { data?: unknown }).data;
   }
+}
+
+export interface X402GraphPaymentConfig {
+  readonly network: string;
+  readonly accountId: string;
+  readonly privateKey: string;
+  readonly maxPrice?: string;
+  readonly requirePayment?: boolean;
+}
+
+export class X402GraphPayment implements GraphQueryTransport {
+  public constructor(
+    private readonly facilitator: Blocky402Client,
+    private readonly config: X402GraphPaymentConfig,
+    private readonly fetchImpl: FetchLike = fetch
+  ) {}
+
+  public async request(input: string, init: RequestInit): Promise<Response> {
+    const capability = await discoverHederaCapability(this.facilitator, this.config.network);
+    const unpaid = await this.fetchImpl(input, init);
+    if (unpaid.status !== 402) {
+      if (this.config.requirePayment !== false) {
+        throw new Error(`VERITY_GRAPH_PAYMENT_REQUIRED: ${input} did not return an x402 challenge`);
+      }
+      return unpaid;
+    }
+
+    const paymentRequired = await parsePaymentRequired(unpaid);
+    const requirements = selectPaymentRequirements(paymentRequired, capability.network, this.config.maxPrice, capability.feePayer);
+    const [{ x402Client }, { ExactHederaScheme, PrivateKey, createClientHederaSigner }] = await Promise.all([
+      import("@x402/core/client"),
+      import("@x402/hedera")
+    ]);
+    const signer = createClientHederaSigner(
+      this.config.accountId,
+      PrivateKey.fromStringECDSA(this.config.privateKey),
+      { network: this.config.network }
+    );
+    const client = new x402Client().setSpendControls(false).register(
+      this.config.network as Network,
+      new ExactHederaScheme(signer)
+    );
+    const paymentPayload = await client.createPaymentPayload(paymentRequired);
+    const headers = new Headers(init.headers);
+    headers.set("payment-signature", encodePaymentSignatureHeader(paymentPayload));
+    const paid = await this.fetchImpl(input, { ...init, headers });
+    if (!paid.ok) return paid;
+
+    const settled = await this.facilitator.settle(paymentPayload, requirements);
+    if (!settled.success || !settled.transaction) {
+      throw new Error(`VERITY_GRAPH_SETTLEMENT_FAILED: ${settled.errorReason ?? "transaction missing"} ${settled.errorMessage ?? ""}`.trim());
+    }
+    return paid;
+  }
+}
+
+async function parsePaymentRequired(response: Response): Promise<PaymentRequired> {
+  const encoded = response.headers.get("payment-required");
+  if (encoded) return decodePaymentRequiredHeader(encoded);
+  const raw = await response.text();
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    throw new Error("VERITY_GRAPH_PAYMENT_REQUIRED: 402 response was not valid JSON", { cause: error });
+  }
+  if (!isPaymentRequired(value)) throw new Error("VERITY_GRAPH_PAYMENT_REQUIRED: 402 response did not match x402 v2");
+  return value;
+}
+
+function selectPaymentRequirements(
+  paymentRequired: PaymentRequired,
+  network: string,
+  maxPrice: string | undefined,
+  feePayer: string
+): PaymentRequirements {
+  const requirements = paymentRequired.accepts.find((entry) => entry.network === network && entry.scheme === "exact");
+  if (!requirements) throw new Error(`VERITY_GRAPH_PAYMENT_UNSUPPORTED: no exact payment on ${network}`);
+  if (maxPrice !== undefined && BigInt(requirements.amount) > BigInt(maxPrice)) {
+    throw new Error(`VERITY_GRAPH_PRICE_LIMIT: query asks for ${requirements.amount}, maxPrice is ${maxPrice}`);
+  }
+  if (requirements.extra?.feePayer !== feePayer) {
+    throw new Error("VERITY_FEE_PAYER_MISMATCH: graph payment requirements do not match the facilitator capability");
+  }
+  return requirements;
+}
+
+function isPaymentRequired(value: unknown): value is PaymentRequired {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PaymentRequired>;
+  return candidate.x402Version === 2 && typeof candidate.resource === "object" && Array.isArray(candidate.accepts);
 }
 
 function parseProvider(value: unknown, agentId: string): ProviderReputation {
