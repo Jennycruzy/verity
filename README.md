@@ -47,6 +47,16 @@ npx verity replay <disputeId>
 
 The command reads only Mirror Node and the configured content store, then exits non-zero if the locally recomputed verdict differs from the recorded verdict.
 
+## Live demo command
+
+With funded Hedera credentials, configured HCS topics, and a running provider:
+
+```sh
+npm run demo
+```
+
+The demo uses the SDK buyer, evaluates the delivered response locally, settles only an accepted verdict, and records the accepted settlement through the HCS-backed coordinator. Missing credentials or topics fail loudly.
+
 ## Design constraints
 
 - Settlement is conditional on a deterministic verdict. A model may produce an input claim, but it cannot decide whether money moves.

@@ -12,6 +12,7 @@ export interface BuyOptions {
   readonly disputeUrl?: string;
   readonly fetchImpl?: typeof fetch;
   readonly facilitator?: Blocky402Client;
+  readonly settle?: (paymentPayload: PaymentPayload, requirements: PaymentRequirements) => Promise<SettleResponse>;
 }
 
 export interface BuyResult {
@@ -57,7 +58,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   const data = await readResponseBody(paidResponse);
   const verdict = await evaluateValue(options.evaluate, data, paidResponse, requirements);
   if (verdict.verdict === "accept") {
-    const settlement = await facilitator.settle(paymentPayload, requirements);
+    const settlement = await (options.settle ? options.settle(paymentPayload, requirements) : facilitator.settle(paymentPayload, requirements));
     if (!settlement.success) {
       throw new Error(`VERITY_SETTLEMENT_FAILED: ${settlement.errorReason ?? "unknown"} ${settlement.errorMessage ?? ""}`.trim());
     }
