@@ -80,8 +80,11 @@ async function handleCheck(request: IncomingMessage, response: ServerResponse, c
   let value: unknown;
   try {
     value = JSON.parse(body);
-  } catch {
-    writeJson(response, 400, { error: "checker_json_invalid" });
+  } catch (error) {
+    writeJson(response, 400, {
+      error: "checker_json_invalid",
+      detail: error instanceof Error ? error.message : String(error)
+    });
     return;
   }
   if (!isRecord(value) || typeof value.ruleId !== "string" || !isRecord(value.value)) {
