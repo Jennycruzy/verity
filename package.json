@@ -14,6 +14,7 @@
     "test:workspaces": "npm run test --workspaces --if-present",
     "typecheck": "tsc -b",
     "discover": "tsx scripts/discover-capabilities.ts",
+    "check:config": "tsx scripts/check-config.ts",
     "provision:topics": "tsx scripts/provision-topics.ts",
     "register:provider": "tsx scripts/register-provider.ts",
     "stake:provider": "tsx scripts/stake-provider.ts",
