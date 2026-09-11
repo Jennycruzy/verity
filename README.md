@@ -28,6 +28,42 @@ Subjective prose quality is outside the product scope.
 | Graph client and routing | `packages/indexer/` |
 | Public explorer HTTP API | `apps/explorer/` |
 
+## SDK quickstart
+
+Protect an existing Node HTTP handler by wrapping it once. The handler still owns its response body; Verity owns the 402 challenge and facilitator verification.
+
+```ts
+import { createServer } from "node:http";
+import { protect } from "@verity/sdk";
+
+const app = async (_request, response) => {
+  response.statusCode = 200;
+  response.setHeader("content-type", "application/json");
+  response.end(JSON.stringify({ expectedRate: "1.08", rate: "1.08", toleranceBps: 25 }));
+};
+
+const protectedApp = protect(app, { price: "100", verifier: "fx-rate-v1" });
+createServer((request, response) => protectedApp({
+  method: request.method ?? "GET",
+  url: request.url ?? "/fx",
+  headers: request.headers
+}, response)).listen(3000);
+```
+
+The buyer receives the response before settlement:
+
+```ts
+import { buy } from "@verity/sdk";
+
+const result = await buy("http://127.0.0.1:3000/fx", {
+  evaluate: "fx-rate-v1",
+  maxPrice: "100"
+});
+console.log(result.verdict, result.settlement?.transaction);
+```
+
+Run the example from the repository after `npm install`, with the provider variables from `.env.example` set. A rejected response additionally needs a bond, verified World ID proof, content store, checker responses, and dispute service configuration; the buyer never settles a rejected response directly.
+
 ## Local checks
 
 Requirements: Node.js 22+, npm, and Foundry only for Solidity commands.
