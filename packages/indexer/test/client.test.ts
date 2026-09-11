@@ -73,3 +73,12 @@ test("paid Graph transport rejects an endpoint that skips the payment challenge"
   );
   await assert.rejects(payment.request("https://graph.invalid/query", { method: "POST" }), /VERITY_GRAPH_PAYMENT_REQUIRED/);
 });
+
+test("rejects reputation data outside the published score bounds", async () => {
+  const client = new GraphReputationClient(
+    "https://graph.invalid/query",
+    { provider: { query: "query Provider { provider { agentId endpoint reliabilityScore completedRequests } }", variables: {} }, buyer: { query: "query Buyer { buyer { root honestyScore disputes } }", variables: {} } },
+    async () => new Response(JSON.stringify({ data: { agentId: "agent-1", endpoint: "https://provider.invalid", reliabilityScore: 1.2, completedRequests: 1 } }), { status: 200 })
+  );
+  await assert.rejects(client.provider("agent-1"), /VERITY_GRAPH_PROVIDER_SCHEMA/);
+});

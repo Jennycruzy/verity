@@ -172,6 +172,10 @@ function parseProvider(value: unknown, agentId: string): ProviderReputation {
   if (record.agentId !== agentId || typeof record.endpoint !== "string" || typeof record.reliabilityScore !== "number" || typeof record.completedRequests !== "number") {
     throw new Error(`VERITY_GRAPH_PROVIDER_SCHEMA: incomplete provider record for ${agentId}`);
   }
+  if (!Number.isFinite(record.reliabilityScore) || record.reliabilityScore < 0 || record.reliabilityScore > 1
+    || !Number.isSafeInteger(record.completedRequests) || record.completedRequests < 0) {
+    throw new Error(`VERITY_GRAPH_PROVIDER_SCHEMA: invalid score or request count for ${agentId}`);
+  }
   return record as ProviderReputation;
 }
 
@@ -180,6 +184,10 @@ function parseBuyer(value: unknown, root: string): BuyerReputation {
   const record = value as Partial<BuyerReputation>;
   if (record.root !== root || typeof record.honestyScore !== "number" || typeof record.disputes !== "number") {
     throw new Error(`VERITY_GRAPH_BUYER_SCHEMA: incomplete buyer record for ${root}`);
+  }
+  if (!Number.isFinite(record.honestyScore) || record.honestyScore < 0 || record.honestyScore > 1
+    || !Number.isSafeInteger(record.disputes) || record.disputes < 0) {
+    throw new Error(`VERITY_GRAPH_BUYER_SCHEMA: invalid score or dispute count for ${root}`);
   }
   return record as BuyerReputation;
 }
