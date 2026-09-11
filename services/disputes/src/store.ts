@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, unlink, writeFile, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import { sha256 } from "@verity/types";
 import type { DisputeResult } from "./service.js";
@@ -48,20 +48,63 @@ export class FileDisputeStore implements DisputeStore {
   public async put(disputeId: string, value: StoredDispute): Promise<void> {
     await mkdir(this.directory, { recursive: true });
     const path = this.pathFor(disputeId);
-    const existing = await this.get(disputeId);
-    if (existing && existing.requestHash !== value.requestHash) {
-      throw new Error(`VERITY_DISPUTE_IDEMPOTENCY_CONFLICT: ${disputeId} already has a different request`);
+    const lock = await this.acquireLock(path);
+    let temporaryPath: string | undefined;
+    try {
+      const existing = await this.get(disputeId);
+      if (existing && existing.requestHash !== value.requestHash) {
+        throw new Error(`VERITY_DISPUTE_IDEMPOTENCY_CONFLICT: ${disputeId} already has a different request`);
+      }
+      temporaryPath = `${path}.${process.pid}.tmp`;
+      await writeFile(temporaryPath, JSON.stringify(value), "utf8");
+      await rename(temporaryPath, path);
+      temporaryPath = undefined;
+    } finally {
+      if (temporaryPath) await unlink(temporaryPath).catch((error: unknown) => {
+        if (!isFileNotFound(error)) throw error;
+      });
+      await this.releaseLock(lock, path);
     }
-    await writeFile(path, JSON.stringify(value), { encoding: "utf8" });
   }
 
   private pathFor(disputeId: string): string {
     return join(this.directory, `${sha256(disputeId)}.json`);
   }
+
+  private async acquireLock(path: string): Promise<FileHandle> {
+    const lockPath = `${path}.lock`;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      try {
+        return await open(lockPath, "wx");
+      } catch (error) {
+        if (!isFileExists(error)) throw error;
+        await wait(25);
+      }
+    }
+    throw new Error(`VERITY_DISPUTE_STORE_LOCK_TIMEOUT: could not acquire ${lockPath}`);
+  }
+
+  private async releaseLock(lock: FileHandle, path: string): Promise<void> {
+    const lockPath = `${path}.lock`;
+    try {
+      await lock.close();
+      await unlink(lockPath);
+    } catch (error) {
+      throw new Error(`VERITY_DISPUTE_STORE_LOCK_RELEASE_FAILED: could not release ${lockPath}`, { cause: error });
+    }
+  }
 }
 
 function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isFileExists(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+async function wait(milliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function isStoredDispute(value: unknown): value is StoredDispute {
