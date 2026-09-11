@@ -61,6 +61,8 @@ The demo uses the SDK buyer, evaluates the delivered response locally, settles o
 
 The bond/stake escrow contract is tested with `npm run contracts:test`. It accepts funds only through explicit payable methods; a plain native transfer reverts because it would not execute contract logic on Hedera.
 
+To deploy the escrow from the compiled artifact, set `VERITY_ESCROW_MINIMUM_BOND` and `VERITY_ESCROW_GAS` in `.env`, run `npm run contracts:build`, then run `npm run contracts:deploy`. The command writes the returned contract ID to `.env` and refuses to overwrite an existing configured deployment.
+
 ## Design constraints
 
 - Settlement is conditional on a deterministic verdict. A model may produce an input claim, but it cannot decide whether money moves.
