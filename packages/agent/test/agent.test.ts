@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { adjudicate } from "../src/adjudication.ts";
 import { requireDisputeEligibility } from "../src/dispute.ts";
-import { MemoryRootStore, WorldIdVerifier } from "../src/identity.ts";
+import { FileRootStore, MemoryRootStore, WorldIdVerifier } from "../src/identity.ts";
 
 test("majority adjudication is deterministic and rule-bound", async () => {
   const result = await adjudicate(
@@ -40,4 +43,18 @@ test("World ID verifier rejects a proof verified for another action", async () =
     async () => new Response(JSON.stringify({ success: true, action: "dispute", nullifier: "root-1" }), { status: 200 })
   );
   await assert.rejects(verifier.verify({ proof: "opaque" }, "provider-account"), /VERITY_WORLD_ID_ACTION_MISMATCH/);
+});
+
+test("persists verified roots across FileRootStore instances", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "verity-roots-"));
+  const path = join(directory, "roots.json");
+  try {
+    const first = new FileRootStore(path);
+    await first.add("dispute", "root-1");
+    const second = new FileRootStore(path);
+    assert.equal(await second.has("dispute", "root-1"), true);
+    await assert.rejects(second.add("dispute", "root-1"), /VERITY_WORLD_ID_REPLAY/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

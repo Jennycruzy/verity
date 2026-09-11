@@ -1,3 +1,6 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+
 export interface WorldIdProof {
   readonly [key: string]: unknown;
 }
@@ -70,6 +73,57 @@ export class MemoryRootStore implements RootStore {
     if (this.values.has(key)) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
     this.values.add(key);
   }
+}
+
+export class FileRootStore implements RootStore {
+  public constructor(private readonly path: string) {
+    if (!path.trim()) throw new Error("VERITY_ROOT_STORE_PATH_MISSING: set a path for verified roots");
+  }
+
+  public async has(action: string, root: string): Promise<boolean> {
+    const values = await this.read();
+    return values[storeKey(action, root)] === true;
+  }
+
+  public async add(action: string, root: string): Promise<void> {
+    const values = await this.read();
+    const key = storeKey(action, root);
+    if (values[key] === true) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
+    values[key] = true;
+    await mkdir(dirname(this.path), { recursive: true });
+    await writeFile(this.path, JSON.stringify(values), "utf8");
+  }
+
+  private async read(): Promise<Record<string, boolean>> {
+    try {
+      const raw = await readFile(this.path, "utf8");
+      let value: unknown;
+      try {
+        value = JSON.parse(raw);
+      } catch (error) {
+        throw new Error(`VERITY_ROOT_STORE_JSON: ${this.path} was not valid JSON`, { cause: error });
+      }
+      if (!isRootMap(value)) throw new Error(`VERITY_ROOT_STORE_SCHEMA: ${this.path} did not contain a root map`);
+      return { ...value };
+    } catch (error) {
+      if (isFileNotFound(error)) return {};
+      throw error;
+    }
+  }
+}
+
+function storeKey(action: string, root: string): string {
+  if (!action.trim() || !root.trim()) throw new Error("VERITY_ROOT_STORE_KEY_INVALID: action and root are required");
+  return `${action}:${root}`;
+}
+
+function isRootMap(value: unknown): value is Record<string, boolean> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every((entry) => entry === true);
+}
+
+function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isVerifiedResponse(value: unknown): value is { action: string; nullifier?: string; nullifierHash?: string; sessionId?: string; session_id?: string; success: boolean } {
