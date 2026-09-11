@@ -11,6 +11,7 @@ export interface DisputeServiceConfig {
   readonly contentStoreBaseUrl: string;
   readonly rootStorePath: string;
   readonly providerRegistryPath: string;
+  readonly providerTopicId: string;
   readonly disputeStoreDirectory: string;
   readonly worldVerifyUrl: string;
   readonly worldAction: string;
@@ -40,6 +41,7 @@ export function readDisputeServiceConfig(env: NodeJS.ProcessEnv = process.env): 
     contentStoreBaseUrl: required(env, "CONTENT_STORE_BASE_URL"),
     rootStorePath: required(env, "VERITY_ROOT_STORE_PATH"),
     providerRegistryPath: required(env, "VERITY_PROVIDER_REGISTRY_FILE"),
+    providerTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
     disputeStoreDirectory: required(env, "DISPUTE_STORE_DIR"),
     worldVerifyUrl: required(env, "WORLD_ID_VERIFY_URL"),
     worldAction: required(env, "WORLD_ID_DISPUTE_ACTION"),

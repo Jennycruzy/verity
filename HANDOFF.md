@@ -18,3 +18,5 @@ Dispute records may carry the buyer's `bondTransactionId`. SDK callers that post
 HCS dispute receipts use hash-only content references and compact checker receipts. The full content metadata stays with the content service; replay reconstructs the content URL from the configured base and verifies the returned bytes against the recorded hash.
 
 World ID roots are durable identity registry keys. The root store rejects reuse of the same action/nullifier pair, so a punished buyer cannot replay the proof from a fresh address; a registered provider can still attach multiple endpoints to its existing root.
+
+Provider eligibility is now anchored as `provider` records on the settlement HCS topic with the provider root, stake amount, payout address, and stake transaction ID. The dispute server reads those records through Mirror Node; `VERITY_PROVIDER_REGISTRY_FILE` remains an operator cache written by the staking command.

@@ -6,12 +6,12 @@ import { createDisputeServer } from "./app.js";
 import { MirrorBondVerifier } from "./bond.js";
 import { HttpCrossChecker } from "./crosschecker.js";
 import { readDisputeServiceConfig } from "./config.js";
-import { readProviderRegistry } from "./registry.js";
+import { readProviderRegistryFromHcs } from "./registry.js";
 import { DisputeProcessor } from "./service.js";
 import { FileDisputeStore } from "./store.js";
 
 const config = readDisputeServiceConfig();
-const providers = await readProviderRegistry(config.providerRegistryPath);
+const providers = await readProviderRegistryFromHcs(config.mirrorNodeBaseUrl, config.providerTopicId);
 const identity = new WorldIdVerifier(
   { verifyUrl: config.worldVerifyUrl, action: config.worldAction },
   new FileRootStore(config.rootStorePath)

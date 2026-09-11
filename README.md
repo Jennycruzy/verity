@@ -123,7 +123,7 @@ The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live 
 
 With the same Graph configuration, start the public explorer with `npm --workspace @verity/explorer start`. Open `http://127.0.0.1:8787/` to query provider reliability or buyer honesty. The browser page and JSON routes both call `GraphReputationClient`; there is no parallel local reputation database.
 
-The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the provider registry, and the Mirror Node URL. For three local FX checker processes, set:
+The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the settlement HCS topic, and the Mirror Node URL. It loads provider eligibility from `provider` records on that topic; the local provider JSON is only an operator cache. For three local FX checker processes, set:
 
 ```sh
 DISPUTE_CHECKERS_JSON='[{"id":"fx-a","url":"http://127.0.0.1:3101/check"},{"id":"fx-b","url":"http://127.0.0.1:3102/check"},{"id":"fx-c","url":"http://127.0.0.1:3103/check"}]'

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { createHederaClient, createVerityEscrowClient } from "@verity/hcs";
+import { createHederaClient, createVerityEscrowClient, HederaHcsPublisher } from "@verity/hcs";
 
 const network = required("HEDERA_NETWORK");
 const assetId = required("HEDERA_ASSET_ID");
@@ -14,6 +14,7 @@ const providerAccountId = required("HEDERA_PROVIDER_ACCOUNT_ID");
 const providerPrivateKey = required("HEDERA_PROVIDER_PRIVATE_KEY");
 const providerAddress = required("HEDERA_PROVIDER_EVM_ADDRESS");
 if (!/^0x[0-9a-fA-F]{40}$/.test(providerAddress)) throw new Error("VERITY_PROVIDER_ADDRESS_INVALID: use a 20-byte EVM address");
+const settlementTopicId = required("HCS_SETTLEMENT_TOPIC_ID");
 const contractId = required("VERITY_ESCROW_CONTRACT_ID");
 const gas = positiveInteger("VERITY_ESCROW_GAS");
 const registryPath = required("VERITY_PROVIDER_REGISTRY_FILE");
@@ -22,14 +23,24 @@ const existing = registry.find((entry) => entry.providerId === providerId);
 if (existing) throw new Error(`VERITY_PROVIDER_ALREADY_REGISTERED: ${providerId} already exists in ${registryPath}`);
 
 const client = createHederaClient(network, providerAccountId, providerPrivateKey);
+let stakeTransactionId: string | undefined;
 try {
   const result = await createVerityEscrowClient(client, contractId, gas).stakeProvider(providerRoot, providerStakeAmount);
+  stakeTransactionId = result.transactionId;
+  const hcsTransactionId = await new HederaHcsPublisher(client).publish(settlementTopicId, {
+    schema: "verity/hcs/v1",
+    kind: "provider",
+    id: providerId,
+    recordedAt: new Date().toISOString(),
+    payload: { providerId, providerRoot, providerStakeAmount, providerAddress, stakeTransactionId: result.transactionId }
+  });
   registry.push({ providerId, providerRoot, providerStakeAmount, providerAddress });
   await mkdir(dirname(registryPath), { recursive: true });
   await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
-  console.log(JSON.stringify({ providerId, providerRoot, providerStakeAmount, providerAddress, transactionId: result.transactionId }, null, 2));
+  console.log(JSON.stringify({ providerId, providerRoot, providerStakeAmount, providerAddress, transactionId: result.transactionId, hcsTransactionId }, null, 2));
 } catch (error) {
-  throw new Error(`VERITY_PROVIDER_STAKE_FAILED: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  const transactionContext = stakeTransactionId ? `; stake transaction ${stakeTransactionId} already succeeded` : "";
+  throw new Error(`VERITY_PROVIDER_STAKE_FAILED${transactionContext}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
 } finally {
   client.close();
 }
