@@ -18,6 +18,7 @@ export interface DisputeResolutionRequest extends SettlementRequest {
   readonly providerRoot: string;
   readonly verdict: DeterministicVerdict;
   readonly buyerBondAmount: string;
+  readonly bondTransactionId?: string;
   readonly providerStakeAmount: string;
   readonly evaluationInput: ContentReference;
   readonly buyerResponse: ContentReference;
@@ -114,6 +115,7 @@ export class SettlementCoordinator {
         crossCheckerVerdicts: request.crossCheckerVerdicts,
         verdict: request.verdict.verdict,
         buyerBondAmount: request.buyerBondAmount,
+        ...(request.bondTransactionId ? { bondTransactionId: request.bondTransactionId } : {}),
         providerStakeAmount: request.providerStakeAmount,
         resolution: state,
         ...(transactionId ? { resolutionTransactionId: transactionId } : {})

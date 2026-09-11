@@ -66,6 +66,7 @@ export interface DisputeRecord {
   readonly crossCheckerVerdicts: readonly CrossCheckerVerdict[];
   readonly verdict: Verdict;
   readonly buyerBondAmount: string;
+  readonly bondTransactionId?: string;
   readonly providerStakeAmount: string;
   readonly resolutionTransactionId?: string;
   readonly recordedAt: string;

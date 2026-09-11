@@ -37,6 +37,7 @@ export interface DisputeSubmission {
   readonly identityProof: WorldIdProof;
   readonly identitySignal: string;
   readonly buyerBondAmount: string;
+  readonly bondTransactionId: string;
   readonly evaluationInput: ContentReference;
   readonly buyerResponse: ContentReference;
   readonly providerResponses: readonly ContentReference[];
@@ -47,6 +48,7 @@ export interface DisputeResult {
   readonly requestId: string;
   readonly buyerRoot: string;
   readonly providerRoot: string;
+  readonly bondTransactionId: string;
   readonly verdict: DeterministicVerdict;
   readonly votes: readonly CrossCheckerVerdict[];
   readonly state: Extract<SettlementOutcome["state"], "settled" | "void">;
@@ -125,6 +127,7 @@ export class DisputeProcessor {
       providerRoot: provider.providerRoot,
       verdict,
       buyerBondAmount: eligibility.bondAmount,
+      bondTransactionId: submission.bondTransactionId,
       providerStakeAmount: provider.providerStakeAmount,
       evaluationInput: submission.evaluationInput,
       buyerResponse: submission.buyerResponse,
@@ -137,6 +140,7 @@ export class DisputeProcessor {
       requestId: submission.requestId,
       buyerRoot: eligibility.buyer.root,
       providerRoot: provider.providerRoot,
+      bondTransactionId: submission.bondTransactionId,
       verdict,
       votes: adjudication.votes,
       state: outcome.state,
@@ -167,6 +171,7 @@ function validateSubmission(value: DisputeSubmission, checkerCount: number): voi
   if (!/^\d+$/.test(value.buyerBondAmount) || BigInt(value.buyerBondAmount) <= 0n) {
     throw new DisputeInputError("VERITY_NO_BOND: buyerBondAmount must be a positive integer");
   }
+  if (!value.bondTransactionId.trim()) throw new DisputeInputError("VERITY_BOND_TRANSACTION_MISSING: provide the posted bond transaction ID");
   validateReference(value.evaluationInput, "evaluationInput");
   validateReference(value.buyerResponse, "buyerResponse");
   if (value.providerResponses.length !== checkerCount) {
@@ -195,6 +200,7 @@ export function isDisputeSubmission(value: unknown): value is DisputeSubmission 
     && isRecord(candidate.identityProof)
     && typeof candidate.identitySignal === "string"
     && typeof candidate.buyerBondAmount === "string"
+    && typeof candidate.bondTransactionId === "string"
     && isContentReference(candidate.evaluationInput)
     && isContentReference(candidate.buyerResponse)
     && Array.isArray(candidate.providerResponses)

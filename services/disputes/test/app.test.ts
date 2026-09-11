@@ -64,6 +64,7 @@ function submissionForTest() {
     identityProof: { proof: "opaque" },
     identitySignal: "request-1",
     buyerBondAmount: "10",
+    bondTransactionId: "0.0.9@1.000000000",
     evaluationInput: reference("input"),
     buyerResponse: reference("buyer"),
     providerResponses: [reference("provider-a"), reference("provider-b"), reference("provider-c")]
