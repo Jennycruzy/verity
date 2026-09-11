@@ -57,7 +57,7 @@ async function settleAfterDelay(delaySeconds: number): Promise<Attempt> {
     import("@x402/core/client"),
     import("@x402/hedera")
   ]);
-  const signer = createClientHederaSigner(config.clientAccountId, PrivateKey.fromString(config.clientPrivateKey), { network: config.network });
+  const signer = createClientHederaSigner(config.clientAccountId, PrivateKey.fromStringECDSA(config.clientPrivateKey), { network: config.network });
   const client = new x402Client().setSpendControls(false).register(config.network as Network, new ExactHederaScheme(signer));
   const paymentRequired: PaymentRequired = { x402Version: 2, resource: { url: resourceUrl, description: "Verity hold-window measurement", mimeType: "application/json" }, accepts: [requirements] };
   const paymentPayload = await client.createPaymentPayload(paymentRequired);

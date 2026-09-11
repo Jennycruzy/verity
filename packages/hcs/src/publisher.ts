@@ -21,7 +21,7 @@ export class HederaHcsPublisher implements HcsPublisher {
 
 export function createHederaClient(network: string, accountId: string, privateKey: string): Client {
   const client = networkClient(network);
-  client.setOperator(AccountId.fromString(accountId), PrivateKey.fromString(privateKey));
+  client.setOperator(AccountId.fromString(accountId), PrivateKey.fromStringECDSA(privateKey));
   return client;
 }
 

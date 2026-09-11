@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { PrivateKey } from "@hiero-ledger/sdk";
 import test from "node:test";
-import { toBytes32, VerityEscrowClient, type EscrowCallResult, type EscrowExecutor } from "../src/index.ts";
+import { createHederaClient, toBytes32, VerityEscrowClient, type EscrowCallResult, type EscrowExecutor } from "../src/index.ts";
 
 class ExecutorForTest implements EscrowExecutor {
   public readonly calls: { functionName: string; payableTinybars?: string }[] = [];
@@ -14,6 +15,16 @@ class ExecutorForTest implements EscrowExecutor {
 test("maps arbitrary dispute identities to stable bytes32 values", () => {
   assert.equal(Buffer.from(toBytes32("dispute-1")).toString("hex"), "cf4ede73026c48185e0ae2423af89405fa47fb5640fbe370ed6a2b7f130c4173");
   assert.equal(Buffer.from(toBytes32(`0x${"ab".repeat(32)}`)).toString("hex"), "ab".repeat(32));
+});
+
+test("creates Hedera clients with the configured ECDSA operator key", () => {
+  const key = PrivateKey.generateECDSA();
+  const client = createHederaClient("hedera:testnet", "0.0.1", key.toStringRaw());
+  try {
+    assert.equal(client.operatorPublicKey?.toString(), key.publicKey.toString());
+  } finally {
+    client.close();
+  }
 });
 
 test("escrow calls preserve payable amounts and method names", async () => {
