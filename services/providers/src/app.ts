@@ -1,19 +1,23 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { protect, type ProtectedApplication, type ProtectedRequest } from "@verity/sdk";
-import { canonicalizeEntity } from "@verity/types";
+import { canonicalizeEntity, evaluateEntity, evaluateFxRate, RULE_IDS, type RuleId } from "@verity/types";
 import type { ProviderServiceConfig } from "./config.js";
 
 export function createProviderServer(config: ProviderServiceConfig) {
-  const protectedApplication = config.kind === "fx" ? createFxApplication(config) : createEntityApplication(config);
-  const protectedHandler = protect(protectedApplication, {
-    price: config.kind === "fx" ? config.fxPrice : (request) => entityPrice(config, request),
-    verifier: config.kind === "fx" ? "fx-rate-v1" : "entity-canonical-v1",
-    description: config.kind === "fx" ? "Verity FX rate lookup" : "Verity entity resolution lookup"
-  });
+  return createServer(createProviderHandler(config));
+}
 
-  return createServer(async (request, response) => {
+export function createProviderHandler(config: ProviderServiceConfig) {
+  const protectedApplication = config.kind === "fx" ? createFxApplication(config) : createEntityApplication(config);
+  let protectedHandler: ReturnType<typeof protect> | undefined;
+
+  return async (request: IncomingMessage, response: ServerResponse) => {
     if (request.url === "/health") {
       writeJson(response, 200, { status: "ok", provider: config.kind });
+      return;
+    }
+    if (request.method === "POST" && request.url?.split("?", 1)[0] === "/check") {
+      await handleCheck(request, response, config);
       return;
     }
     if (request.method !== "GET") {
@@ -26,11 +30,51 @@ export function createProviderServer(config: ProviderServiceConfig) {
       writeJson(response, 404, { error: "not_found" });
       return;
     }
+    protectedHandler ??= protect(protectedApplication, {
+      price: config.kind === "fx" ? config.fxPrice : (request) => entityPrice(config, request),
+      verifier: config.kind === "fx" ? "fx-rate-v1" : "entity-canonical-v1",
+      description: config.kind === "fx" ? "Verity FX rate lookup" : "Verity entity resolution lookup"
+    });
     await protectedHandler(
       { method: request.method ?? "GET", url: request.url ?? "/", headers: request.headers },
       response
     );
-  });
+  };
+}
+
+async function handleCheck(request: IncomingMessage, response: ServerResponse, config: ProviderServiceConfig): Promise<void> {
+  const body = await readBody(request, 65_536);
+  let value: unknown;
+  try {
+    value = JSON.parse(body);
+  } catch (error) {
+    writeJson(response, 400, { error: "checker_json_invalid" });
+    return;
+  }
+  if (!isRecord(value) || typeof value.ruleId !== "string" || !isRecord(value.value)) {
+    writeJson(response, 400, { error: "checker_schema_invalid" });
+    return;
+  }
+  const ruleId = value.ruleId as RuleId;
+  if (ruleId !== expectedRule(config.kind)) {
+    writeJson(response, 400, { error: "checker_rule_unsupported", expectedRule: expectedRule(config.kind) });
+    return;
+  }
+  try {
+    const verdict = ruleId === RULE_IDS.fxRate
+      ? evaluateFxRate({
+        expectedRate: requiredString(value.value.expectedRate, "expectedRate"),
+        actualRate: requiredString(value.value.actualRate, "actualRate"),
+        toleranceBps: requiredInteger(value.value.toleranceBps, "toleranceBps")
+      })
+      : evaluateEntity({
+        expected: requiredString(value.value.expected, "expected"),
+        actual: requiredString(value.value.actual, "actual")
+      });
+    writeJson(response, 200, verdict);
+  } catch (error) {
+    writeJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 function createFxApplication(config: ProviderServiceConfig): ProtectedApplication {
@@ -83,6 +127,36 @@ function writeJson(response: ServerResponse, statusCode: number, body: unknown):
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.end(JSON.stringify(body));
+}
+
+async function readBody(request: IncomingMessage, maxBytes: number): Promise<string> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of request) {
+    const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += value.byteLength;
+    if (total > maxBytes) throw new Error(`VERITY_CHECKER_BODY_TOO_LARGE: request exceeds ${maxBytes} bytes`);
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, total).toString("utf8");
+}
+
+function expectedRule(kind: ProviderServiceConfig["kind"]): RuleId {
+  return kind === "fx" ? RULE_IDS.fxRate : RULE_IDS.entityCanonical;
+}
+
+function requiredString(value: unknown, name: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`VERITY_CHECKER_FIELD_INVALID: ${name} must be a non-empty string`);
+  return value;
+}
+
+function requiredInteger(value: unknown, name: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new Error(`VERITY_CHECKER_FIELD_INVALID: ${name} must be an integer`);
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 export function startProvider(config: ProviderServiceConfig): ReturnType<typeof createServer> {
