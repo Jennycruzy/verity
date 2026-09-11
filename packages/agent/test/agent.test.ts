@@ -50,6 +50,21 @@ test("World ID verifier stores a durable root and rejects proof reuse", async ()
   await assert.rejects(verifier.verify(proof, "provider-account"), /VERITY_WORLD_ID_REPLAY/);
 });
 
+test("World ID verifier claims a root only once under concurrent requests", async () => {
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "dispute" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "dispute", nullifier: "root-1" }), { status: 200 })
+  );
+  const results = await Promise.allSettled([
+    verifier.verify({ proof: "opaque-a", signal_hash: hashWorldSignal("dispute-1") }, "dispute-1"),
+    verifier.verify({ proof: "opaque-b", signal_hash: hashWorldSignal("dispute-1") }, "dispute-1")
+  ]);
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  assert.match(String(results.find((result) => result.status === "rejected")?.reason), /VERITY_WORLD_ID_REPLAY/);
+});
+
 test("World ID verifier rejects a proof verified for another action", async () => {
   const verifier = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },

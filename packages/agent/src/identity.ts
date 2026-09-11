@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { keccak_256 } from "@noble/hashes/sha3";
 
@@ -15,6 +15,7 @@ export interface VerifiedRoot {
 
 export interface RootStore {
   has(action: string, root: string): Promise<boolean>;
+  claim(action: string, root: string): Promise<boolean>;
   add(action: string, root: string): Promise<void>;
 }
 
@@ -77,10 +78,9 @@ export class WorldIdVerifier {
     const rootValue = body.nullifier ?? body.nullifierHash ?? body.sessionId ?? body.session_id;
     if (!rootValue) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
     const root = normalizeWorldRoot(rootValue);
-    if (await this.roots.has(this.config.action, root)) {
+    if (!await this.roots.claim(this.config.action, root)) {
       throw new Error("VERITY_WORLD_ID_REPLAY: this root has already been used for the configured action");
     }
-    await this.roots.add(this.config.action, root);
     return { root, action: this.config.action, verifiedAt: new Date().toISOString(), provider: "world-id" };
   }
 }
@@ -92,10 +92,15 @@ export class MemoryRootStore implements RootStore {
     return this.values.has(`${action}:${root}`);
   }
 
-  public async add(action: string, root: string): Promise<void> {
+  public async claim(action: string, root: string): Promise<boolean> {
     const key = `${action}:${root}`;
-    if (this.values.has(key)) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
+    if (this.values.has(key)) return false;
     this.values.add(key);
+    return true;
+  }
+
+  public async add(action: string, root: string): Promise<void> {
+    if (!await this.claim(action, root)) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
   }
 }
 
@@ -109,13 +114,53 @@ export class FileRootStore implements RootStore {
     return values[storeKey(action, root)] === true;
   }
 
-  public async add(action: string, root: string): Promise<void> {
-    const values = await this.read();
+  public async claim(action: string, root: string): Promise<boolean> {
     const key = storeKey(action, root);
-    if (values[key] === true) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
-    values[key] = true;
+    const lock = await this.acquireLock();
+    let temporaryPath: string | undefined;
+    try {
+      const values = await this.read();
+      if (values[key] === true) return false;
+      values[key] = true;
+      temporaryPath = `${this.path}.${process.pid}.tmp`;
+      await writeFile(temporaryPath, JSON.stringify(values), "utf8");
+      await rename(temporaryPath, this.path);
+      temporaryPath = undefined;
+      return true;
+    } finally {
+      if (temporaryPath) await unlink(temporaryPath).catch((error: unknown) => {
+        if (!isFileNotFound(error)) throw error;
+      });
+      await this.releaseLock(lock);
+    }
+  }
+
+  public async add(action: string, root: string): Promise<void> {
+    if (!await this.claim(action, root)) throw new Error("VERITY_WORLD_ID_REPLAY: root already exists");
+  }
+
+  private async acquireLock(): Promise<import("node:fs/promises").FileHandle> {
+    const lockPath = `${this.path}.lock`;
     await mkdir(dirname(this.path), { recursive: true });
-    await writeFile(this.path, JSON.stringify(values), "utf8");
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      try {
+        return await open(lockPath, "wx");
+      } catch (error) {
+        if (!isFileExists(error)) throw error;
+        await wait(25);
+      }
+    }
+    throw new Error(`VERITY_ROOT_STORE_LOCK_TIMEOUT: could not acquire ${lockPath}`);
+  }
+
+  private async releaseLock(lock: import("node:fs/promises").FileHandle): Promise<void> {
+    const lockPath = `${this.path}.lock`;
+    try {
+      await lock.close();
+      await unlink(lockPath);
+    } catch (error) {
+      throw new Error(`VERITY_ROOT_STORE_LOCK_RELEASE_FAILED: could not release ${lockPath}`, { cause: error });
+    }
   }
 
   private async read(): Promise<Record<string, boolean>> {
@@ -148,6 +193,14 @@ function isRootMap(value: unknown): value is Record<string, boolean> {
 
 function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isFileExists(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+async function wait(milliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function assertWorldSignalBinding(proof: WorldIdProof, signal: string): void {
