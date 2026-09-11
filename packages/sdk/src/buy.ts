@@ -79,8 +79,9 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   const verdict = await evaluateValue(options.evaluate, data, paidResponse, requirements);
   if (verdict.verdict === "accept") {
     const settlement = await (options.settle ? options.settle(paymentPayload, requirements) : facilitator.settle(paymentPayload, requirements));
-    if (!settlement.success) {
-      throw new Error(`VERITY_SETTLEMENT_FAILED: ${settlement.errorReason ?? "unknown"} ${settlement.errorMessage ?? ""}`.trim());
+    if (!settlement.success || !settlement.transaction) {
+      const detail = settlement.success ? "transaction missing" : `${settlement.errorReason ?? "unknown"} ${settlement.errorMessage ?? ""}`.trim();
+      throw new Error(`VERITY_SETTLEMENT_FAILED: ${detail}`);
     }
     return { data, verdict, paymentPayload, requirements, settlement };
   }
@@ -173,8 +174,14 @@ function createBondPoster(config: ReturnType<typeof readBuyerConfig>) {
   const contractId = requiredEnvironment("VERITY_ESCROW_CONTRACT_ID");
   const gas = Number(requiredEnvironment("VERITY_ESCROW_GAS"));
   if (!Number.isSafeInteger(gas) || gas <= 0) throw new Error("VERITY_ESCROW_GAS_INVALID: use a positive integer gas limit");
-  const client = createHederaClient(config.network, config.clientAccountId, config.clientPrivateKey);
-  return async (disputeId: string, providerRoot: string, amountTinybars: string) => createVerityEscrowClient(client, contractId, gas).postBond(disputeId, providerRoot, amountTinybars);
+  return async (disputeId: string, providerRoot: string, amountTinybars: string) => {
+    const client = createHederaClient(config.network, config.clientAccountId, config.clientPrivateKey);
+    try {
+      return await createVerityEscrowClient(client, contractId, gas).postBond(disputeId, providerRoot, amountTinybars);
+    } finally {
+      client.close();
+    }
+  };
 }
 
 function replayInput(evaluator: Evaluator, value: unknown): unknown {
@@ -219,8 +226,15 @@ function selectRequirements(paymentRequired: PaymentRequired, network: string, m
   if (!requirements) {
     throw new Error(`VERITY_NO_ACCEPTED_PAYMENT: resource does not accept exact payments on ${network}`);
   }
-  if (maxPrice !== undefined && BigInt(requirements.amount) > BigInt(maxPrice)) {
-    throw new Error(`VERITY_PRICE_LIMIT: resource asks for ${requirements.amount}, maxPrice is ${maxPrice}`);
+  if (!/^\d+$/.test(requirements.amount) || BigInt(requirements.amount) <= 0n) {
+    throw new Error("VERITY_PAYMENT_AMOUNT_INVALID: resource payment amount must be a positive integer");
+  }
+  const normalizedMaxPrice = maxPrice?.trim();
+  if (normalizedMaxPrice && (!/^\d+$/.test(normalizedMaxPrice) || BigInt(normalizedMaxPrice) <= 0n)) {
+    throw new Error("VERITY_MAX_PRICE_INVALID: maxPrice must be a positive integer");
+  }
+  if (normalizedMaxPrice && BigInt(requirements.amount) > BigInt(normalizedMaxPrice)) {
+    throw new Error(`VERITY_PRICE_LIMIT: resource asks for ${requirements.amount}, maxPrice is ${normalizedMaxPrice}`);
   }
   return requirements;
 }
