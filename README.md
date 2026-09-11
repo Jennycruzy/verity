@@ -27,6 +27,8 @@ npm run discover
 
 `npm run discover` calls the configured facilitator's `/supported` endpoint and writes the observed response to `artifacts/capabilities.json`. The command rejects a facilitator that does not advertise the configured Hedera network, `exact` scheme, protocol version, and fee-payer signer.
 
+After the buyer/operator account is funded and its credentials are in `.env`, `npm run provision:topics` creates or verifies the settlement and dispute HCS topics, then writes their IDs back to `.env`. Re-running the command verifies existing topics instead of creating duplicates.
+
 ## Run a reference provider
 
 Set the provider variables from `.env.example`, then choose `PROVIDER_KIND=fx` or `PROVIDER_KIND=entity` and run:
