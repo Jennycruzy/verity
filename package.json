@@ -13,7 +13,8 @@
     "test": "npm run build && npm run test:workspaces",
     "test:workspaces": "npm run test --workspaces --if-present",
     "typecheck": "tsc -b",
-    "discover": "tsx scripts/discover-capabilities.ts"
+    "discover": "tsx scripts/discover-capabilities.ts",
+    "measure-hold": "tsx scripts/measure-hold-window.ts"
   },
   "dependencies": {
     "@x402/core": "2.25.0",
