@@ -4,5 +4,6 @@ dist/
 .env.*
 !.env.example
 artifacts/
+cache/
 *.tsbuildinfo
 .DS_Store

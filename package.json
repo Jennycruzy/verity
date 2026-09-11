@@ -15,7 +15,8 @@
     "typecheck": "tsc -b",
     "discover": "tsx scripts/discover-capabilities.ts",
     "measure-hold": "tsx scripts/measure-hold-window.ts",
-    "demo": "tsx scripts/demo.ts"
+    "demo": "tsx scripts/demo.ts",
+    "contracts:test": "forge test --offline"
   },
   "dependencies": {
     "@x402/core": "2.25.0",

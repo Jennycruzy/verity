@@ -57,6 +57,8 @@ npm run demo
 
 The demo uses the SDK buyer, evaluates the delivered response locally, settles only an accepted verdict, and records the accepted settlement through the HCS-backed coordinator. Missing credentials or topics fail loudly.
 
+The bond/stake escrow contract is tested with `npm run contracts:test`. It accepts funds only through explicit payable methods; a plain native transfer reverts because it would not execute contract logic on Hedera.
+
 ## Design constraints
 
 - Settlement is conditional on a deterministic verdict. A model may produce an input claim, but it cannot decide whether money moves.
