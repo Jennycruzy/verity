@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/types" },
+    { "path": "./packages/content" },
     { "path": "./packages/hedera" },
     { "path": "./packages/hcs" },
     { "path": "./packages/sdk" },
