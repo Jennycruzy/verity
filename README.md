@@ -74,6 +74,7 @@ npm install
 npm run build
 npm test
 npm run typecheck
+npm run check:config
 ```
 
 The repository has no testnet dependency for these checks. A funded Hedera account is needed only for commands that create topics, deploy escrow, stake, post bonds, or settle a real payment.
@@ -85,6 +86,8 @@ The repository has no testnet dependency for these checks. A funded Hedera accou
 ```sh
 npm run discover
 ```
+
+`npm run check:config` performs the same capability check, reports missing settings by use case, and reads public account balances from Mirror Node without printing secret values. It is the quickest way to see whether the next action is configuration or funding.
 
 The operator account needs testnet HBAR before running the following command. It creates or verifies both HCS topics and writes the IDs to `.env`:
 
@@ -113,6 +116,8 @@ PROVIDER_KIND=fx PORT=3103 npm --workspace @verity/providers start
 ```
 
 The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker endpoint is `POST /check` with `{ "ruleId": "...", "value": { ... } }`. The provider process validates inputs and returns the same deterministic verdict used by the buyer.
+
+When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC8004_AGENT_ID` are set, the provider also serves `GET /.well-known/agent-registration.json` with its x402 resource, checker, and registry references.
 
 The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the provider registry, and the Mirror Node URL. For three local FX checker processes, set:
 
@@ -162,7 +167,7 @@ After a dispute receipt is visible on the configured topic:
 npx verity replay <disputeId>
 ```
 
-Replay reads the dispute record from Mirror Node, fetches the evaluation input by its recorded SHA-256, verifies the bytes, runs the published rule locally, prints both verdicts, and exits non-zero on mismatch. It does not use the dispute database or a Verity service.
+Replay reads the dispute record from Mirror Node, fetches the evaluation input, delivered response, and every competing provider response by recorded SHA-256, verifies each byte stream, recomputes each checker vote and the strict majority locally, prints the recorded and replayed result, and exits non-zero on any mismatch. It does not use the dispute database or a Verity service.
 
 ## Public records
 
