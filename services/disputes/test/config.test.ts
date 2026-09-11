@@ -13,7 +13,6 @@ const baseEnv = {
   ]),
   CONTENT_STORE_BASE_URL: "https://content.invalid",
   VERITY_ROOT_STORE_PATH: "artifacts/roots.json",
-  VERITY_PROVIDER_REGISTRY_FILE: "artifacts/providers.json",
   HCS_SETTLEMENT_TOPIC_ID: "0.0.9",
   DISPUTE_STORE_DIR: "artifacts/disputes",
   WORLD_ID_VERIFY_URL: "https://world.invalid/verify",
