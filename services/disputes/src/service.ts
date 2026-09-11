@@ -123,9 +123,18 @@ export class DisputeProcessor {
       amountTinybars: submission.buyerBondAmount
     });
     const evaluationInput = await this.content.readJson(submission.evaluationInput);
+    await this.content.readJson(submission.buyerResponse);
+    const providerResponses = await Promise.all(submission.providerResponses.map((reference) => this.content.readJson(reference)));
     const buyer = await this.identity.verify(submission.identityProof, submission.identitySignal);
     const eligibility = requireDisputeEligibility(buyer, submission.buyerBondAmount);
-    const adjudication = await adjudicate({ ruleId: submission.ruleId, value: evaluationInput }, this.checkers);
+    const boundCheckers = this.checkers.map((checker, index) => ({
+      id: checker.id,
+      check: (input: { ruleId: RuleId; value: unknown }) => checker.check({
+        ruleId: input.ruleId,
+        value: checkerValue(submission.ruleId, evaluationInput, providerResponses[index])
+      })
+    }));
+    const adjudication = await adjudicate({ ruleId: submission.ruleId, value: evaluationInput }, boundCheckers);
     const verdict = majorityVerdict(submission.ruleId, adjudication.verdict, adjudication.votes.length);
     const request: DisputeResolutionRequest = {
       requestId: submission.requestId,
@@ -200,6 +209,33 @@ function validateReference(value: ContentReference, name: string): void {
     throw new DisputeInputError(`VERITY_CONTENT_REFERENCE_INVALID: ${name} is not a valid content reference`);
   }
   if (value.uri !== undefined && !value.uri.trim()) throw new DisputeInputError(`VERITY_CONTENT_REFERENCE_INVALID: ${name}.uri is empty`);
+}
+
+function checkerValue(ruleId: RuleId, evaluationInput: unknown, providerResponse: unknown): unknown {
+  if (!isRecord(evaluationInput) || !isRecord(providerResponse)) {
+    throw new DisputeInputError(`VERITY_PROVIDER_RESPONSE_INVALID: ${ruleId} responses must be JSON objects`);
+  }
+  if (ruleId === RULE_IDS.fxRate) {
+    return {
+      expectedRate: requiredResponseString(evaluationInput.expectedRate, "evaluationInput.expectedRate"),
+      actualRate: requiredResponseString(providerResponse.rate ?? providerResponse.actualRate, "providerResponse.rate"),
+      toleranceBps: requiredResponseInteger(evaluationInput.toleranceBps, "evaluationInput.toleranceBps")
+    };
+  }
+  return {
+    expected: requiredResponseString(evaluationInput.expected, "evaluationInput.expected"),
+    actual: requiredResponseString(providerResponse.entity ?? providerResponse.actual, "providerResponse.entity")
+  };
+}
+
+function requiredResponseString(value: unknown, name: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new DisputeInputError(`VERITY_PROVIDER_RESPONSE_INVALID: ${name} must be a non-empty string`);
+  return value;
+}
+
+function requiredResponseInteger(value: unknown, name: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new DisputeInputError(`VERITY_PROVIDER_RESPONSE_INVALID: ${name} must be an integer`);
+  return value;
 }
 
 export function isDisputeSubmission(value: unknown): value is DisputeSubmission {

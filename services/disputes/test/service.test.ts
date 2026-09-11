@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { CrossChecker } from "@verity/agent";
 import type { ContentStore } from "@verity/content";
-import { sha256 } from "@verity/types";
+import { evaluateFxRate, sha256 } from "@verity/types";
 import { DisputeProcessor, MemoryProviderRegistry, MemoryDisputeStore, type DisputeSubmission } from "../src/index.ts";
 
 const input = { actualRate: "1.10", expectedRate: "1.00", toleranceBps: 100 };
@@ -15,9 +15,26 @@ const checkers: CrossChecker[] = [
 
 test("adjudicates a bonded rejection and records the complete result", async () => {
   const stored: unknown[] = [];
+  const checkedValues: unknown[] = [];
+  const submission = submissionForTest();
+  const providerValues = [{ rate: "1.10" }, { rate: "1.10" }, { rate: "1.00" }];
+  const evaluatingCheckers: CrossChecker[] = ["checker-a", "checker-b", "checker-c"].map((id) => ({
+    id,
+    check: async ({ value }) => evaluateFxRate(value as { expectedRate: string; actualRate: string; toleranceBps: number })
+  }));
+  const observingCheckers = evaluatingCheckers.map((checker) => ({
+    id: checker.id,
+    check: async (input: { ruleId: "fx-rate-v1"; value: unknown }) => {
+      checkedValues.push(input.value);
+      return checker.check(input);
+    }
+  }));
   const content: ContentStore = {
     putJson: async () => ref(JSON.stringify(input)),
-    readJson: async () => input
+    readJson: async (reference) => {
+      const index = submission.providerResponses.findIndex((candidate) => candidate.sha256 === reference.sha256);
+      return index >= 0 ? providerValues[index] : input;
+    }
   };
   const settlement = {
     async recordAdjudication(request: { verdict: { verdict: string }; crossCheckerVerdicts: readonly unknown[] }) {
@@ -31,17 +48,21 @@ test("adjudicates a bonded rejection and records the complete result", async () 
     { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
     provider,
     content,
-    checkers,
+    observingCheckers,
     settlement,
     bondVerifier,
     new MemoryDisputeStore()
   );
-  const submission = submissionForTest();
   const first = await processor.submit(submission);
   assert.equal(first.created, true);
   assert.equal(first.result.verdict.verdict, "reject");
   assert.equal(first.result.state, "void");
   assert.equal(first.result.votes.length, 3);
+  assert.deepEqual(checkedValues, [
+    { expectedRate: "1.00", actualRate: "1.10", toleranceBps: 100 },
+    { expectedRate: "1.00", actualRate: "1.10", toleranceBps: 100 },
+    { expectedRate: "1.00", actualRate: "1.00", toleranceBps: 100 }
+  ]);
   assert.equal(stored.length, 1);
   const retry = await processor.submit(submission);
   assert.equal(retry.created, false);
