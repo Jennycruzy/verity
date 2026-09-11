@@ -68,6 +68,43 @@ contract VerityBondEscrowTest {
         require(escrow.providerStake(PROVIDER_ROOT) == 0, "provider stake was not withdrawable");
     }
 
+    function testLockedStakeCannotBeWithdrawnOrLockedTwice() public {
+        buyer.postBond{ value: BOND }(payable(address(escrow)), DISPUTE, PROVIDER_ROOT);
+        provider.stake{ value: 3 ether }(payable(address(escrow)), PROVIDER_ROOT);
+        escrow.lockStake(DISPUTE, 2 ether);
+
+        (bool withdrawSuccess,) = address(provider).call(
+            abi.encodeWithSelector(Actor.withdraw.selector, payable(address(escrow)), PROVIDER_ROOT, 2 ether)
+        );
+        require(!withdrawSuccess, "locked stake was withdrawable");
+
+        (bool secondLockSuccess,) = address(escrow).call(
+            abi.encodeWithSelector(VerityBondEscrow.lockStake.selector, DISPUTE, 1 ether)
+        );
+        require(!secondLockSuccess, "stake was locked twice");
+        require(escrow.totalLockedStake(PROVIDER_ROOT) == 2 ether, "provider lock total was incorrect");
+    }
+
+    function testResolutionRecipientsMustMatchRecordedParties() public {
+        buyer.postBond{ value: BOND }(payable(address(escrow)), DISPUTE, PROVIDER_ROOT);
+        provider.stake{ value: 2 ether }(payable(address(escrow)), PROVIDER_ROOT);
+        escrow.lockStake(DISPUTE, 2 ether);
+
+        Actor other = new Actor();
+        (bool success,) = address(escrow).call(
+            abi.encodeWithSelector(
+                VerityBondEscrow.resolveBond.selector,
+                DISPUTE,
+                true,
+                payable(address(other)),
+                payable(address(provider))
+            )
+        );
+        require(!success, "operator redirected bond to an unrecorded buyer");
+        (,,, bool resolved) = escrow.bonds(DISPUTE);
+        require(!resolved, "invalid resolution changed bond state");
+    }
+
     function testPlainTransferReverts() public {
         (bool success,) = address(escrow).call{ value: 1 wei }("");
         require(!success, "plain native transfer unexpectedly succeeded");

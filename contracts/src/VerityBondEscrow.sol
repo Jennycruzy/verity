@@ -12,6 +12,8 @@ contract VerityBondEscrow {
     error NotOperator();
     error NotStakeOwner(bytes32 providerRoot);
     error Reentrancy();
+    error InvalidResolutionRecipient();
+    error StakeAlreadyLocked(bytes32 disputeId);
     error StakeOwnerAlreadySet(bytes32 providerRoot);
     error TransferFailed(address recipient, uint256 amount);
 
@@ -35,6 +37,7 @@ contract VerityBondEscrow {
     mapping(bytes32 => Bond) public bonds;
     mapping(bytes32 => uint256) public providerStake;
     mapping(bytes32 => uint256) public lockedStake;
+    mapping(bytes32 => uint256) public totalLockedStake;
     mapping(bytes32 => address) public stakeOwner;
     mapping(bytes32 => Reputation) public reputation;
     mapping(bytes32 => uint64) public buyerHonest;
@@ -96,7 +99,7 @@ contract VerityBondEscrow {
     function withdrawStake(bytes32 providerRoot, uint256 amount) external nonReentrant {
         if (stakeOwner[providerRoot] != msg.sender) revert NotStakeOwner(providerRoot);
         if (amount == 0) revert InvalidAmount();
-        uint256 available = providerStake[providerRoot] - lockedStake[providerRoot];
+        uint256 available = providerStake[providerRoot] - totalLockedStake[providerRoot];
         if (amount > available) revert InsufficientAvailableStake(providerRoot, amount, available);
         providerStake[providerRoot] -= amount;
         _send(payable(msg.sender), amount);
@@ -107,9 +110,12 @@ contract VerityBondEscrow {
         Bond memory bond = bonds[disputeId];
         if (bond.amount == 0) revert BondNotFound(disputeId);
         if (bond.resolved) revert AlreadyResolved(disputeId);
-        uint256 available = providerStake[bond.providerRoot] - lockedStake[bond.providerRoot];
+        if (amount == 0) revert InvalidAmount();
+        if (lockedStake[disputeId] != 0) revert StakeAlreadyLocked(disputeId);
+        uint256 available = providerStake[bond.providerRoot] - totalLockedStake[bond.providerRoot];
         if (amount > available) revert InsufficientAvailableStake(bond.providerRoot, amount, available);
         lockedStake[disputeId] = amount;
+        totalLockedStake[bond.providerRoot] += amount;
         emit StakeLocked(disputeId, bond.providerRoot, amount);
     }
 
@@ -117,10 +123,12 @@ contract VerityBondEscrow {
         Bond storage bond = bonds[disputeId];
         if (bond.amount == 0) revert BondNotFound(disputeId);
         if (bond.resolved) revert AlreadyResolved(disputeId);
+        if (buyer != bond.buyer || provider != stakeOwner[bond.providerRoot]) revert InvalidResolutionRecipient();
         bond.resolved = true;
 
         uint256 slashedStake = lockedStake[disputeId];
         lockedStake[disputeId] = 0;
+        totalLockedStake[bond.providerRoot] -= slashedStake;
         if (providerWasWrong) {
             providerStake[bond.providerRoot] -= slashedStake;
             _send(buyer, bond.amount + slashedStake);
