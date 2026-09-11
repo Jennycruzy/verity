@@ -91,6 +91,7 @@ function createFxApplication(config: ProviderServiceConfig): ProtectedApplicatio
     writeJson(response, 200, {
       service: "fx-rate",
       pair: config.fxPair,
+      expectedRate: config.fxReferenceRate,
       rate,
       toleranceBps: config.fxToleranceBps,
       usageUnits: 1,
@@ -111,6 +112,7 @@ function createEntityApplication(config: ProviderServiceConfig): ProtectedApplic
     writeJson(response, 200, {
       service: "entity-resolution",
       input: name,
+      expected: name,
       entity: canonical,
       cached: !fresh,
       usageUnits: fresh ? 3 : 1,

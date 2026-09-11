@@ -141,7 +141,8 @@ export class DisputeProcessor {
       amountTinybars: submission.buyerBondAmount
     });
     const evaluationInput = await this.content.readJson(submission.evaluationInput);
-    await this.content.readJson(submission.buyerResponse);
+    const buyerResponse = await this.content.readJson(submission.buyerResponse);
+    validateBuyerResponse(submission.ruleId, evaluationInput, buyerResponse);
     const providerResponses = await Promise.all(submission.providerResponses.map((reference) => this.content.readJson(reference)));
     const buyer = await this.identity.verify(submission.identityProof, submission.identitySignal);
     const eligibility = requireDisputeEligibility(buyer, submission.buyerBondAmount);
@@ -244,6 +245,21 @@ function checkerValue(ruleId: RuleId, evaluationInput: unknown, providerResponse
     expected: requiredResponseString(evaluationInput.expected, "evaluationInput.expected"),
     actual: requiredResponseString(providerResponse.entity ?? providerResponse.actual, "providerResponse.entity")
   };
+}
+
+function validateBuyerResponse(ruleId: RuleId, evaluationInput: unknown, buyerResponse: unknown): void {
+  if (!isRecord(evaluationInput) || !isRecord(buyerResponse)) {
+    throw new DisputeInputError(`VERITY_BUYER_RESPONSE_INVALID: ${ruleId} responses must be JSON objects`);
+  }
+  const expectedActual = ruleId === RULE_IDS.fxRate
+    ? requiredResponseString(evaluationInput.actualRate, "evaluationInput.actualRate")
+    : requiredResponseString(evaluationInput.actual, "evaluationInput.actual");
+  const actual = ruleId === RULE_IDS.fxRate
+    ? requiredResponseString(buyerResponse.rate ?? buyerResponse.actualRate, "buyerResponse.rate")
+    : requiredResponseString(buyerResponse.entity ?? buyerResponse.actual, "buyerResponse.entity");
+  if (actual !== expectedActual) {
+    throw new DisputeInputError(`VERITY_BUYER_RESPONSE_MISMATCH: ${ruleId} input does not match the delivered buyer response`);
+  }
 }
 
 function requiredResponseString(value: unknown, name: string): string {

@@ -5,7 +5,7 @@ import type { ContentStore } from "@verity/content";
 import { evaluateFxRate, sha256 } from "@verity/types";
 import { DisputeProcessor, MemoryProviderRegistry, MemoryDisputeStore, type DisputeSubmission } from "../src/index.ts";
 
-const input = { actualRate: "1.10", expectedRate: "1.00", toleranceBps: 100 };
+const input = { actualRate: "1.10", expectedRate: "1.00", toleranceBps: 100, rate: "1.10" };
 const ref = (value: string) => ({ sha256: sha256(value), mediaType: "application/json", byteLength: Buffer.byteLength(value), uri: `https://content.invalid/${sha256(value)}` });
 const checkers: CrossChecker[] = [
   { id: "checker-a", check: async () => ({ verdict: "reject", ruleId: "fx-rate-v1", reasonCode: "RATE_OUTSIDE_TOLERANCE", evidence: {} }) },
@@ -109,6 +109,24 @@ test("runs concurrent identical submissions once", async () => {
   assert.equal(second.created, false);
   assert.equal(settlementCalls, 1);
   assert.deepEqual(second.result, first.result);
+});
+
+test("rejects a buyer response that does not match the evaluation input", async () => {
+  const submission = submissionForTest();
+  const content: ContentStore = {
+    putJson: async () => ref("{}"),
+    readJson: async (reference) => reference.sha256 === submission.evaluationInput.sha256 ? input : { rate: "0.90" }
+  };
+  const settlement = { recordAdjudication: async () => ({ state: "void" as const, hcsTransactionId: "hcs-1" }) };
+  const processor = new DisputeProcessor(
+    { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
+    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]])),
+    content,
+    checkers,
+    settlement,
+    { verify: async () => undefined }
+  );
+  await assert.rejects(processor.submit(submission), /VERITY_BUYER_RESPONSE_MISMATCH/);
 });
 
 test("requires one provider response reference per checker", async () => {
