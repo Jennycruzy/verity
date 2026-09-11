@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Blocky402Client } from "@verity/hedera";
+import { encodeHcsRecord } from "@verity/hcs";
 import { SettlementCoordinator } from "../src/service.ts";
 
 class FacilitatorForTest extends Blocky402Client {
@@ -77,14 +78,15 @@ test("records a complete upheld dispute without settling the held payment", asyn
   const published: unknown[] = [];
   const coordinator = new SettlementCoordinator(
     new FacilitatorForTest("https://facilitator.invalid"),
-    { publish: async (_topic, record) => { published.push(record); return "0.0.8@3.000000000"; } },
+    { publish: async (_topic, record) => { encodeHcsRecord(record); published.push(record); return "0.0.8@3.000000000"; } },
     { settlement: "0.0.7", dispute: "0.0.8" },
     escrowForTest()
   );
   const result = await coordinator.recordAdjudication(disputeRequest("reject"));
   assert.equal(result.state, "void");
   assert.equal(result.transactionId, undefined);
-  assert.deepEqual((published[0] as { payload: { evaluationInput: unknown; resolution: string } }).payload.evaluationInput, { sha256: "input-hash", mediaType: "application/json", byteLength: 42 });
+  assert.equal(published.length, 3);
+  assert.deepEqual((published[0] as { payload: { evaluationInput: unknown; resolution: string } }).payload.evaluationInput, { sha256: "input-hash" });
   assert.equal((published[0] as { payload: { resolution: string } }).payload.resolution, "void");
 });
 
@@ -92,14 +94,14 @@ test("settles and records an overturned dispute", async () => {
   const published: unknown[] = [];
   const coordinator = new SettlementCoordinator(
     new FacilitatorForTest("https://facilitator.invalid"),
-    { publish: async (_topic, record) => { published.push(record); return "0.0.8@4.000000000"; } },
+    { publish: async (_topic, record) => { encodeHcsRecord(record); published.push(record); return "0.0.8@4.000000000"; } },
     { settlement: "0.0.7", dispute: "0.0.8" },
     escrowForTest()
   );
   const result = await coordinator.recordAdjudication(disputeRequest("accept"));
   assert.equal(result.state, "settled");
   assert.equal(result.transactionId, "0.0.99@1.000000000");
-  assert.equal((published[0] as { payload: { resolutionTransactionId: string } }).payload.resolutionTransactionId, "0.0.99@1.000000000");
+  assert.equal((published[2] as { payload: { resolutionTransactionId: string } }).payload.resolutionTransactionId, "0.0.99@1.000000000");
 });
 
 function escrowForTest() {

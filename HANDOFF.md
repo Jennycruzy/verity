@@ -14,3 +14,5 @@ The dispute record now carries an `evaluationInput` content reference. Replay us
 The shared dispute schema now uses `CrossCheckerVerdict` for compact checker identity, rule, verdict, and reason fields. Full evaluator evidence remains off-chain so HCS records stay within the message limit; replay continues to use the immutable evaluation input and rule.
 
 Dispute records may carry the buyer's `bondTransactionId`. SDK callers that post a bond must pass this transaction ID through the dispute intake so the HCS audit can link the bond movement to the adjudication.
+
+HCS dispute receipts use hash-only content references and compact checker receipts. The full content metadata stays with the content service; replay reconstructs the content URL from the configured base and verifies the returned bytes against the recorded hash.

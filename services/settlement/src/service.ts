@@ -41,6 +41,7 @@ export interface SettlementOutcome {
   readonly bondResolutionTransactionId?: string;
   readonly reputationTransactionId?: string;
   readonly hcsTransactionId: string;
+  readonly hcsTransactionIds?: readonly string[];
 }
 
 export class SettlementCoordinator {
@@ -124,13 +125,12 @@ export class SettlementCoordinator {
     if (state !== "void" && state !== "settled") {
       throw new Error(`VERITY_ADJUDICATION_STATE: resolution ended in ${state}`);
     }
-    const record = {
+    const disputeRecord = {
       schema: "verity/hcs/v1" as const,
       kind: "dispute" as const,
       id: request.disputeId,
       recordedAt: new Date().toISOString(),
       payload: {
-        disputeId: request.disputeId,
         requestId: request.requestId,
         providerId: request.providerId,
         buyerId: request.buyerId,
@@ -140,26 +140,56 @@ export class SettlementCoordinator {
         evaluationInput: compactReference(request.evaluationInput),
         buyerResponse: compactReference(request.buyerResponse),
         providerResponses: request.providerResponses.map(compactReference),
-        crossCheckerVerdicts: request.crossCheckerVerdicts,
+        crossCheckerVerdicts: request.crossCheckerVerdicts.map((vote) => ({ checkerId: vote.checkerId, verdict: vote.verdict })),
         verdict: request.verdict.verdict,
         buyerBondAmount: request.buyerBondAmount,
-        ...(request.bondTransactionId ? { bondTransactionId: request.bondTransactionId } : {}),
         providerStakeAmount: request.providerStakeAmount,
+        resolution: state
+      }
+    };
+    const verdictRecord = {
+      schema: "verity/hcs/v1" as const,
+      kind: "verdict" as const,
+      id: `${request.disputeId}:verdict`,
+      recordedAt: disputeRecord.recordedAt,
+      payload: {
+        disputeId: request.disputeId,
+        ruleId: request.ruleId,
+        verdict: request.verdict.verdict,
+        crossCheckerVerdicts: request.crossCheckerVerdicts.map((vote) => ({ checkerId: vote.checkerId, verdict: vote.verdict }))
+      }
+    };
+    const bondRecord = {
+      schema: "verity/hcs/v1" as const,
+      kind: "bond" as const,
+      id: `${request.disputeId}:bond`,
+      recordedAt: disputeRecord.recordedAt,
+      payload: {
+        disputeId: request.disputeId,
         resolution: state,
-        stakeLockTransactionId,
-        bondResolutionTransactionId,
-        reputationTransactionId,
+        ...(request.bondTransactionId ? { bondTransactionId: request.bondTransactionId } : {}),
+        ...(stakeLockTransactionId ? { stakeLockTransactionId } : {}),
+        ...(bondResolutionTransactionId ? { bondResolutionTransactionId } : {}),
+        ...(reputationTransactionId ? { reputationTransactionId } : {}),
         ...(transactionId ? { resolutionTransactionId: transactionId } : {})
       }
     };
-    const hcsTransactionId = await this.hcs.publish(this.topics.dispute, record);
+    const hcsTransactionIds: string[] = [];
+    try {
+      hcsTransactionIds.push(await this.hcs.publish(this.topics.dispute, disputeRecord));
+      hcsTransactionIds.push(await this.hcs.publish(this.topics.dispute, verdictRecord));
+      hcsTransactionIds.push(await this.hcs.publish(this.topics.dispute, bondRecord));
+    } catch (error) {
+      throw new Error(`VERITY_DISPUTE_ANCHOR_FAILED: ${hcsTransactionIds.length} dispute records published`, { cause: error });
+    }
     return {
       state,
       ...(transactionId ? { transactionId } : {}),
       stakeLockTransactionId,
       bondResolutionTransactionId,
       reputationTransactionId,
-      hcsTransactionId
+      hcsTransactionId: hcsTransactionIds[0] as string,
+      hcsTransactionIds
     };
   }
 
@@ -197,6 +227,6 @@ async function resolveEscrow(
   };
 }
 
-function compactReference(reference: ContentReference): ContentReference {
-  return { sha256: reference.sha256, mediaType: reference.mediaType, byteLength: reference.byteLength };
+function compactReference(reference: ContentReference): { sha256: string } {
+  return { sha256: reference.sha256 };
 }

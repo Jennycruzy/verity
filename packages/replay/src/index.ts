@@ -1,5 +1,5 @@
 import { readTopicRecords } from "@verity/hcs";
-import { evaluateEntity, evaluateFxRate, type DisputeRecord, type RuleId } from "@verity/types";
+import { evaluateEntity, evaluateFxRate, sha256, type ContentHashReference, type DisputeRecord, type RuleId } from "@verity/types";
 
 export interface ReplayConfig {
   readonly mirrorNodeBaseUrl: string;
@@ -37,19 +37,18 @@ export async function replayDispute(disputeId: string, config: ReplayConfig, opt
   };
 }
 
-async function fetchContent(reference: DisputeRecord["evaluationInput"], baseUrl: string, fetchImpl: FetchLike): Promise<unknown> {
-  const uri = reference.uri ?? `${baseUrl.replace(/\/$/, "")}/${encodeURIComponent(reference.sha256)}`;
+async function fetchContent(reference: ContentHashReference, baseUrl: string, fetchImpl: FetchLike): Promise<unknown> {
+  const uri = `${baseUrl.replace(/\/$/, "")}/content/${encodeURIComponent(reference.sha256)}`;
   const response = await fetchImpl(uri);
-  const raw = await response.text();
-  if (!response.ok) throw new Error(`VERITY_CONTENT_HTTP_${response.status}: ${raw}`);
-  if (reference.mediaType.includes("json")) {
-    try {
-      return JSON.parse(raw);
-    } catch (error) {
-      throw new Error(`VERITY_CONTENT_JSON: ${uri} was not valid JSON`, { cause: error });
-    }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!response.ok) throw new Error(`VERITY_CONTENT_HTTP_${response.status}: ${new TextDecoder().decode(bytes)}`);
+  const actualHash = sha256(bytes);
+  if (actualHash !== reference.sha256) throw new Error(`VERITY_CONTENT_HASH_MISMATCH: expected ${reference.sha256}, received ${actualHash}`);
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    throw new Error(`VERITY_CONTENT_JSON: ${uri} was not valid JSON`, { cause: error });
   }
-  return raw;
 }
 
 function evaluateInput(ruleId: RuleId, input: unknown) {
@@ -74,8 +73,8 @@ function evaluateInput(ruleId: RuleId, input: unknown) {
 
 function parseDisputeRecord(value: Record<string, unknown>, disputeId: string): DisputeRecord {
   const candidate = value as Partial<DisputeRecord>;
-  if (candidate.disputeId !== disputeId || typeof candidate.ruleId !== "string" || typeof candidate.verdict !== "string" || !candidate.evaluationInput) {
+  if ((candidate.disputeId !== undefined && candidate.disputeId !== disputeId) || typeof candidate.ruleId !== "string" || typeof candidate.verdict !== "string" || !candidate.evaluationInput) {
     throw new Error(`VERITY_REPLAY_SCHEMA: dispute ${disputeId} did not contain the replay inputs`);
   }
-  return candidate as DisputeRecord;
+  return { ...candidate, disputeId } as DisputeRecord;
 }

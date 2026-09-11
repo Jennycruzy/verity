@@ -17,7 +17,7 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
       disputeId: "dispute-1",
       ruleId: "fx-rate-v1" as const,
       verdict: "reject" as const,
-      evaluationInput: { sha256: hash, mediaType: "application/json", byteLength: serialized.length, uri: "https://content.invalid/input" }
+      evaluationInput: { sha256: hash }
     }
   };
   const encoded = Buffer.from(encodeHcsRecord(record)).toString("base64");
@@ -26,7 +26,7 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
     if (url === "https://mirror.invalid/api/v1/topics/0.0.7/messages") {
       return new Response(JSON.stringify({ messages: [{ consensus_timestamp: "1", sequence_number: 1, message: encoded }], links: { next: null } }), { status: 200 });
     }
-    if (url === "https://content.invalid/input") return new Response(serialized, { status: 200, headers: { "content-type": "application/json" } });
+    if (url === `https://content.invalid/content/${hash}`) return new Response(serialized, { status: 200, headers: { "content-type": "application/json" } });
     throw new Error(`unexpected URL ${url}`);
   };
   const result = await replayDispute("dispute-1", { mirrorNodeBaseUrl: "https://mirror.invalid", disputeTopicId: "0.0.7", contentStoreBaseUrl: "https://content.invalid" }, { fetchImpl });

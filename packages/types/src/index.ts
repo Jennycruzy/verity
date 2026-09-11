@@ -22,6 +22,11 @@ export interface CrossCheckerVerdict {
   readonly reasonCode: string;
 }
 
+export interface CrossCheckerReceipt {
+  readonly checkerId: string;
+  readonly verdict: Verdict;
+}
+
 export interface FxRateObservation {
   readonly expectedRate: string;
   readonly actualRate: string;
@@ -38,6 +43,10 @@ export interface ContentReference {
   readonly mediaType: string;
   readonly byteLength: number;
   readonly uri?: string;
+}
+
+export interface ContentHashReference {
+  readonly sha256: string;
 }
 
 export interface PaymentReceipt {
@@ -60,10 +69,10 @@ export interface DisputeRecord {
   readonly ruleId: RuleId;
   readonly buyerRoot: string;
   readonly providerRoot: string;
-  readonly evaluationInput: ContentReference;
-  readonly buyerResponse: ContentReference;
-  readonly providerResponses: readonly ContentReference[];
-  readonly crossCheckerVerdicts: readonly CrossCheckerVerdict[];
+  readonly evaluationInput: ContentHashReference;
+  readonly buyerResponse: ContentHashReference;
+  readonly providerResponses: readonly ContentHashReference[];
+  readonly crossCheckerVerdicts: readonly CrossCheckerReceipt[];
   readonly verdict: Verdict;
   readonly buyerBondAmount: string;
   readonly bondTransactionId?: string;
