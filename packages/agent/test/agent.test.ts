@@ -37,7 +37,7 @@ test("normalizes equivalent hexadecimal roots to one durable key", () => {
   assert.throws(() => normalizeWorldRoot("0x0"), /VERITY_WORLD_ID_ROOT_INVALID/);
 });
 
-test("World ID verifier stores a root before returning eligibility", async () => {
+test("World ID verifier stores a durable root and allows later use", async () => {
   const roots = new MemoryRootStore();
   const verifier = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
@@ -47,7 +47,8 @@ test("World ID verifier stores a root before returning eligibility", async () =>
   const proof = { proof: "opaque", signal_hash: hashWorldSignal("provider-account") };
   const verified = await verifier.verify(proof, "provider-account");
   assert.equal(verified.root, "root-1");
-  await assert.rejects(verifier.verify(proof, "provider-account"), /VERITY_WORLD_ID_REPLAY/);
+  const repeated = await verifier.verify(proof, "provider-account");
+  assert.equal(repeated.root, "root-1");
 });
 
 test("World ID verifier rejects a proof verified for another action", async () => {
@@ -82,7 +83,8 @@ test("persists verified roots across FileRootStore instances", async () => {
     await first.add("dispute", "root-1");
     const second = new FileRootStore(path);
     assert.equal(await second.has("dispute", "root-1"), true);
-    await assert.rejects(second.add("dispute", "root-1"), /VERITY_WORLD_ID_REPLAY/);
+    await second.add("dispute", "root-1");
+    assert.equal(await second.has("dispute", "root-1"), true);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

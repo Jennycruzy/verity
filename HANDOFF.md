@@ -16,3 +16,5 @@ The shared dispute schema now uses `CrossCheckerVerdict` for compact checker ide
 Dispute records may carry the buyer's `bondTransactionId`. SDK callers that post a bond must pass this transaction ID through the dispute intake so the HCS audit can link the bond movement to the adjudication.
 
 HCS dispute receipts use hash-only content references and compact checker receipts. The full content metadata stays with the content service; replay reconstructs the content URL from the configured base and verifies the returned bytes against the recorded hash.
+
+World ID roots are durable identity registry keys, not one-time nonces. Root registration is idempotent so one verified human can reuse standing across legitimate disputes and multiple provider endpoints.
