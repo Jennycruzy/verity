@@ -6,6 +6,7 @@
     { "path": "./packages/hcs" },
     { "path": "./packages/sdk" },
     { "path": "./packages/replay" },
+    { "path": "./packages/agent" },
     { "path": "./services/providers" },
     { "path": "./services/settlement" }
   ]
