@@ -12,7 +12,9 @@
     }
   },
   "dependencies": {
+    "@verity/content": "0.1.0",
     "@verity/hedera": "0.1.0",
+    "@verity/hcs": "0.1.0",
     "@verity/types": "0.1.0",
     "@x402/core": "2.25.0",
     "@x402/hedera": "2.25.0"
@@ -20,5 +22,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --import tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@hiero-ledger/sdk": "2.85.0"
   }
 }

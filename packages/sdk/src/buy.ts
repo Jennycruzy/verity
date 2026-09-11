@@ -1,7 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
 import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements, SettleResponse } from "@x402/core/types";
+import { HttpContentStore, type ContentStore } from "@verity/content";
 import { Blocky402Client, readBuyerConfig } from "@verity/hedera";
-import { evaluateEntity, evaluateFxRate, RULE_IDS, type DeterministicVerdict, type RuleId } from "@verity/types";
+import { createHederaClient, createVerityEscrowClient } from "@verity/hcs";
+import { evaluateEntity, evaluateFxRate, RULE_IDS, type ContentReference, type DeterministicVerdict, type RuleId } from "@verity/types";
 
 export type Evaluator = RuleId | ((value: unknown, response: Response, requirements: PaymentRequirements) => DeterministicVerdict | Promise<DeterministicVerdict>);
 
@@ -10,6 +13,17 @@ export interface BuyOptions {
   readonly bond?: string;
   readonly maxPrice?: string;
   readonly disputeUrl?: string;
+  readonly requestId?: string;
+  readonly disputeId?: string;
+  readonly providerId?: string;
+  readonly buyerId?: string;
+  readonly providerRoot?: string;
+  readonly identityProof?: Readonly<Record<string, unknown>>;
+  readonly identitySignal?: string;
+  readonly evaluationInput?: unknown;
+  readonly providerResponses?: readonly ContentReference[];
+  readonly contentStore?: ContentStore;
+  readonly postBond?: (disputeId: string, providerRoot: string, amountTinybars: string) => Promise<{ transactionId: string }>;
   readonly fetchImpl?: typeof fetch;
   readonly facilitator?: Blocky402Client;
   readonly settle?: (paymentPayload: PaymentPayload, requirements: PaymentRequirements) => Promise<SettleResponse>;
@@ -22,6 +36,8 @@ export interface BuyResult {
   readonly requirements: PaymentRequirements;
   readonly settlement?: SettleResponse;
   readonly dispute?: unknown;
+  readonly disputeId?: string;
+  readonly bondTransactionId?: string;
 }
 
 export async function buy(url: string, options: BuyOptions): Promise<BuyResult> {
@@ -41,7 +57,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   ]);
   const signer = createClientHederaSigner(
     config.clientAccountId,
-    PrivateKey.fromString(config.clientPrivateKey),
+    PrivateKey.fromStringECDSA(config.clientPrivateKey),
     { network: config.network }
   );
   const client = new x402Client().setSpendControls(false).register(config.network as Network, new ExactHederaScheme(signer));
@@ -76,16 +92,99 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
     throw new Error("VERITY_DISPUTE_URL_MISSING: configure disputeUrl to submit a bonded rejection");
   }
 
+  const providerId = requiredOption(options.providerId, "VERITY_PROVIDER_ID_MISSING: configure providerId for a bonded rejection");
+  const buyerId = requiredOption(options.buyerId, "VERITY_BUYER_ID_MISSING: configure buyerId for a bonded rejection");
+  const providerRoot = requiredOption(options.providerRoot, "VERITY_PROVIDER_ROOT_MISSING: configure providerRoot before posting a bond");
+  const identityProof = options.identityProof;
+  if (!identityProof) throw new Error("VERITY_IDENTITY_PROOF_MISSING: provide a verified World ID proof before rejecting a response");
+  const identitySignal = requiredOption(options.identitySignal, "VERITY_IDENTITY_SIGNAL_MISSING: provide the signal bound to the dispute");
+  const providerResponses = options.providerResponses;
+  if (!providerResponses || providerResponses.length !== 3) {
+    throw new Error("VERITY_PROVIDER_RESPONSES_MISSING: provide exactly three independent provider response references");
+  }
+
+  const contentStore = options.contentStore ?? new HttpContentStore(requiredEnvironment("CONTENT_STORE_BASE_URL"));
+  const evaluationInput = await contentStore.putJson(options.evaluationInput ?? replayInput(options.evaluate, data));
+  const buyerResponse = await contentStore.putJson(data);
+  const disputeId = options.disputeId ?? randomUUID();
+  const requestId = options.requestId ?? randomUUID();
+  const bond = options.postBond ?? createBondPoster(config);
+  let bondTransactionId: string;
+  try {
+    const bondResult = await bond(disputeId, providerRoot, options.bond);
+    bondTransactionId = bondResult.transactionId;
+  } catch (error) {
+    throw new Error(`VERITY_BOND_POST_FAILED: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+
   const disputeResponse = await fetchImpl(disputeUrl, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ paymentPayload, requirements, bond: options.bond, verdict })
+    headers: { "content-type": "application/json", "idempotency-key": disputeId },
+    body: JSON.stringify({
+      disputeId,
+      requestId,
+      providerId,
+      buyerId,
+      ruleId: verdict.ruleId,
+      paymentPayload,
+      paymentRequirements: requirements,
+      identityProof,
+      identitySignal,
+      buyerBondAmount: options.bond,
+      bondTransactionId,
+      evaluationInput,
+      buyerResponse,
+      providerResponses
+    })
   });
   const disputeBody = await readResponseBody(disputeResponse);
   if (!disputeResponse.ok) {
     throw new Error(`VERITY_DISPUTE_FAILED: ${disputeResponse.status} ${JSON.stringify(disputeBody)}`);
   }
-  return { data, verdict, paymentPayload, requirements, dispute: disputeBody };
+  return { data, verdict, paymentPayload, requirements, dispute: disputeBody, disputeId, bondTransactionId };
+}
+
+function requiredOption(value: string | undefined, message: string): string {
+  if (!value?.trim()) throw new Error(message);
+  return value.trim();
+}
+
+function requiredEnvironment(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`VERITY_CONFIG_MISSING: ${name} is required; set it in .env`);
+  return value;
+}
+
+function createBondPoster(config: ReturnType<typeof readBuyerConfig>) {
+  if (process.env.HEDERA_ASSET_ID?.trim() !== "0.0.0") {
+    throw new Error("VERITY_ESCROW_ASSET_UNSUPPORTED: bond escrow currently accepts HBAR only; set HEDERA_ASSET_ID=0.0.0");
+  }
+  const contractId = requiredEnvironment("VERITY_ESCROW_CONTRACT_ID");
+  const gas = Number(requiredEnvironment("VERITY_ESCROW_GAS"));
+  if (!Number.isSafeInteger(gas) || gas <= 0) throw new Error("VERITY_ESCROW_GAS_INVALID: use a positive integer gas limit");
+  const client = createHederaClient(config.network, config.clientAccountId, config.clientPrivateKey);
+  return async (disputeId: string, providerRoot: string, amountTinybars: string) => createVerityEscrowClient(client, contractId, gas).postBond(disputeId, providerRoot, amountTinybars);
+}
+
+function replayInput(evaluator: Evaluator, value: unknown): unknown {
+  if (typeof evaluator !== "string") {
+    throw new Error("VERITY_EVALUATION_INPUT_MISSING: custom evaluators must provide { evaluationInput } for replay");
+  }
+  if (!value || typeof value !== "object") throw new Error(`VERITY_EVALUATION_INPUT: ${evaluator} requires a JSON object response`);
+  const record = value as Record<string, unknown>;
+  if (evaluator === RULE_IDS.fxRate) {
+    if (typeof record.expectedRate !== "string" || typeof record.rate !== "string" || typeof record.toleranceBps !== "number") {
+      throw new Error("VERITY_EVALUATION_INPUT: fx-rate-v1 requires expectedRate, rate, and toleranceBps");
+    }
+    return { expectedRate: record.expectedRate, actualRate: record.rate, toleranceBps: record.toleranceBps };
+  }
+  if (evaluator === RULE_IDS.entityCanonical) {
+    if (typeof record.expected !== "string" || typeof record.entity !== "string") {
+      throw new Error("VERITY_EVALUATION_INPUT: entity-canonical-v1 requires expected and entity");
+    }
+    return { expected: record.expected, actual: record.entity };
+  }
+  throw new Error(`VERITY_RULE_UNKNOWN: ${evaluator}`);
 }
 
 async function parsePaymentRequired(response: Response): Promise<PaymentRequired> {
