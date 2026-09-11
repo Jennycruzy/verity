@@ -77,6 +77,36 @@ test("World ID verifier rejects a proof verified for another action", async () =
   );
 });
 
+test("World ID verifier accepts a legacy nullifier_hash response", async () => {
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "register-provider", nullifier_hash: "0x2a" }), { status: 200 })
+  );
+  const verified = await verifier.verify({ proof: "opaque", signal_hash: hashWorldSignal("provider-account") }, "provider-account");
+  assert.equal(verified.root, "42");
+});
+
+test("World ID verifier reads a nested uniqueness result and refuses session-only responses", async () => {
+  const nested = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "register-provider", results: [{ success: true, nullifier: "0x2b" }] }), { status: 200 })
+  );
+  const verified = await nested.verify({ proof: "opaque", signal_hash: hashWorldSignal("provider-account") }, "provider-account");
+  assert.equal(verified.root, "43");
+
+  const sessionOnly = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "register-provider", session_id: "session-1" }), { status: 200 })
+  );
+  await assert.rejects(
+    sessionOnly.verify({ proof: "opaque", signal_hash: hashWorldSignal("provider-account") }, "provider-account"),
+    /VERITY_WORLD_ID_REJECTED/
+  );
+});
+
 test("World ID verifier rejects a proof bound to another signal", async () => {
   const verifier = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },

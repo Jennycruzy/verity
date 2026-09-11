@@ -75,7 +75,7 @@ export class WorldIdVerifier {
     if (body.action !== this.config.action) {
       throw new Error(`VERITY_WORLD_ID_ACTION_MISMATCH: expected ${this.config.action}, received ${body.action}`);
     }
-    const rootValue = body.nullifier ?? body.nullifierHash ?? body.sessionId ?? body.session_id;
+    const rootValue = extractWorldRoot(body);
     if (!rootValue) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
     const root = normalizeWorldRoot(rootValue);
     if (!await this.roots.claim(this.config.action, root)) {
@@ -236,10 +236,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isVerifiedResponse(value: unknown): value is { action: string; nullifier?: string; nullifierHash?: string; sessionId?: string; session_id?: string; success: boolean } {
+function isVerifiedResponse(value: unknown): value is WorldVerifyResponse {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as { action?: unknown; nullifier?: unknown; nullifierHash?: unknown; sessionId?: unknown; session_id?: unknown; success?: unknown; verified?: unknown };
+  const candidate = value as WorldVerifyResponse;
   return typeof candidate.action === "string"
     && (candidate.success === true || candidate.verified === true)
-    && (typeof candidate.nullifier === "string" || typeof candidate.nullifierHash === "string" || typeof candidate.sessionId === "string" || typeof candidate.session_id === "string");
+    && Boolean(extractWorldRoot(candidate));
+}
+
+interface WorldVerifyResponse {
+  readonly action?: unknown;
+  readonly success?: unknown;
+  readonly verified?: unknown;
+  readonly nullifier?: unknown;
+  readonly nullifierHash?: unknown;
+  readonly nullifier_hash?: unknown;
+  readonly results?: readonly unknown[];
+}
+
+function extractWorldRoot(value: WorldVerifyResponse): string | undefined {
+  const direct = [value.nullifier, value.nullifierHash, value.nullifier_hash].find(isNonEmptyString);
+  if (direct) return direct;
+  if (!Array.isArray(value.results)) return undefined;
+  for (const result of value.results) {
+    if (!isRecord(result)) continue;
+    const nested = [result.nullifier, result.nullifierHash, result.nullifier_hash].find(isNonEmptyString);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
