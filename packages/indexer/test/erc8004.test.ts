@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createErc8004Registration, erc8004AgentKey, normalizeErc8004AgentId, normalizeErc8004Registry } from "../src/erc8004.ts";
+
+test("canonicalizes an ERC-8004 registry and token identity", () => {
+  const reference = { agentRegistry: "EIP155:001:0xABC", agentId: "00022" };
+  assert.equal(normalizeErc8004Registry(reference.agentRegistry), "eip155:1:0xabc");
+  assert.equal(normalizeErc8004AgentId(reference.agentId), "22");
+  assert.equal(erc8004AgentKey(reference), "eip155:1:0xabc:22");
+});
+
+test("builds the standard registration file shape", () => {
+  const registration = createErc8004Registration({
+    name: "Verity FX",
+    description: "Objectively verifiable FX responses",
+    services: [{ name: "web", endpoint: "https://provider.invalid/fx", version: "x402-v2" }],
+    x402Support: true,
+    active: true,
+    registrations: [{ agentRegistry: "eip155:11155111:0xabc", agentId: "7" }],
+    supportedTrust: ["reputation", "crypto-economic"]
+  });
+  assert.equal(registration.type, "https://eips.ethereum.org/EIPS/eip-8004#registration-v1");
+  assert.equal(registration.registrations[0]?.agentId, "7");
+  assert.equal(registration.services[0]?.endpoint, "https://provider.invalid/fx");
+});
+
+test("rejects an incomplete standard identity", () => {
+  assert.throws(() => normalizeErc8004Registry("eip155:1"), /VERITY_ERC8004_REGISTRY_INVALID/);
+  assert.throws(() => normalizeErc8004AgentId("-1"), /VERITY_ERC8004_AGENT_ID_INVALID/);
+  assert.throws(() => createErc8004Registration({
+    name: "agent",
+    description: "description",
+    services: [],
+    x402Support: true,
+    active: true,
+    registrations: []
+  }), /VERITY_ERC8004_SERVICES/);
+});
