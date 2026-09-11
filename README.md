@@ -119,6 +119,8 @@ The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker end
 
 When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC8004_AGENT_ID` are set, the provider also serves `GET /.well-known/agent-registration.json` with its x402 resource, checker, and registry references.
 
+The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live Graph endpoint and query files configured, `npm run graph:mcp` exposes provider reliability and buyer honesty as MCP tools. The Graph transport requires an x402 challenge and settles the query before returning data.
+
 The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the provider registry, and the Mirror Node URL. For three local FX checker processes, set:
 
 ```sh
@@ -193,7 +195,7 @@ The resource server delivers before settlement, so the payment hold must survive
 | Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Implemented; needs deployment and funded accounts |
 | Proof of Human root | `packages/agent/src/identity.ts:1` | Adapter implemented; World credentials/config required |
 | Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor implemented; public score indexing remains |
-| Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1` and `packages/indexer/src/router.ts:1` | Paid Graph transport and reputation routing implemented; hosted Subgraph/Substreams deployment remains |
+| Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
 | Scheduled transactions | — | Not implemented |
 | HTS custom fee settlement asset | — | Not implemented |
 | ERC-8004/HCS-14 registry | `packages/indexer/src/erc8004.ts:1` | Standard identity primitives implemented; live Hedera registry is not available in the current target deployment |
