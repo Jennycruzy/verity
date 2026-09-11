@@ -26,9 +26,18 @@ test("World ID verifier stores a root before returning eligibility", async () =>
   const verifier = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
     roots,
-    async () => new Response(JSON.stringify({ success: true, nullifier: "root-1" }), { status: 200 })
+    async () => new Response(JSON.stringify({ success: true, action: "register-provider", nullifier: "root-1" }), { status: 200 })
   );
   const verified = await verifier.verify({ proof: "opaque" }, "provider-account");
   assert.equal(verified.root, "root-1");
   await assert.rejects(verifier.verify({ proof: "opaque" }, "provider-account"), /VERITY_WORLD_ID_REPLAY/);
+});
+
+test("World ID verifier rejects a proof verified for another action", async () => {
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "dispute", nullifier: "root-1" }), { status: 200 })
+  );
+  await assert.rejects(verifier.verify({ proof: "opaque" }, "provider-account"), /VERITY_WORLD_ID_ACTION_MISMATCH/);
 });

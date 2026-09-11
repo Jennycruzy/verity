@@ -45,6 +45,9 @@ export class WorldIdVerifier {
     if (!response.ok || !isVerifiedResponse(body)) {
       throw new Error(`VERITY_WORLD_ID_REJECTED: ${response.status} ${JSON.stringify(body)}`);
     }
+    if (body.action !== this.config.action) {
+      throw new Error(`VERITY_WORLD_ID_ACTION_MISMATCH: expected ${this.config.action}, received ${body.action}`);
+    }
     const root = body.nullifier ?? body.nullifierHash ?? body.sessionId ?? body.session_id;
     if (!root) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
     if (await this.roots.has(this.config.action, root)) {
@@ -69,9 +72,10 @@ export class MemoryRootStore implements RootStore {
   }
 }
 
-function isVerifiedResponse(value: unknown): value is { nullifier?: string; nullifierHash?: string; sessionId?: string; session_id?: string; success: boolean } {
+function isVerifiedResponse(value: unknown): value is { action: string; nullifier?: string; nullifierHash?: string; sessionId?: string; session_id?: string; success: boolean } {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as { nullifier?: unknown; nullifierHash?: unknown; sessionId?: unknown; session_id?: unknown; success?: unknown; verified?: unknown };
-  return (candidate.success === true || candidate.verified === true)
+  const candidate = value as { action?: unknown; nullifier?: unknown; nullifierHash?: unknown; sessionId?: unknown; session_id?: unknown; success?: unknown; verified?: unknown };
+  return typeof candidate.action === "string"
+    && (candidate.success === true || candidate.verified === true)
     && (typeof candidate.nullifier === "string" || typeof candidate.nullifierHash === "string" || typeof candidate.sessionId === "string" || typeof candidate.session_id === "string");
 }
