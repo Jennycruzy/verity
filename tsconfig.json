@@ -9,6 +9,7 @@
     { "path": "./packages/agent" },
     { "path": "./packages/indexer" },
     { "path": "./services/providers" },
-    { "path": "./services/settlement" }
+    { "path": "./services/settlement" },
+    { "path": "./apps/explorer" }
   ]
 }

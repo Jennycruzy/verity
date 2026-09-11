@@ -1,0 +1,15 @@
+{
+  "name": "@verity/explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "dependencies": {
+    "@verity/indexer": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/*.test.ts"
+  }
+}
