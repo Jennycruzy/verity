@@ -2,78 +2,162 @@
 
 Verity is a pay-per-correct-answer settlement layer for objectively verifiable x402 services on Hedera.
 
-The repository is intentionally starting with the smallest trustworthy foundation:
+The buyer receives the provider response before settlement. A deterministic evaluator then either settles the payment or submits a bonded dispute. Disputes require a verified human root, are checked by an odd set of HTTP checkers, resolve through the escrow contract, and are recorded as compact HCS receipts. The replay command recomputes the recorded rule from Mirror Node and content storage.
 
-- runtime discovery of the Blocky402 capability contract;
-- strict shared types for deterministic evaluation;
-- no embedded accounts, keys, prices, or endpoints;
-- a build that fails loudly when required runtime configuration is absent.
+The supported reference services are:
 
-The current packages include the two-entry SDK, a real HTTP provider process, compact HCS publishing and Mirror Node reads, deterministic dispute replay, settlement state transitions, verified-root eligibility, majority adjudication, a Graph-backed reputation client, and a database-free explorer API.
+- FX rate lookup: a fixed lookup price and numeric tolerance rule.
+- Entity resolution: cached and fresh prices based on observed request usage, with canonical-form equality.
 
-## Current status
+Subjective prose quality is outside the product scope.
 
-The live Blocky402 capability check is implemented. Product flows are not claimed complete until they have a real Hedera transaction ID and an independently readable HCS receipt.
+## Repository map
 
-## Local setup
+| Concern | Location |
+| --- | --- |
+| Two-entry SDK (`protect`, `buy`) | `packages/sdk/src/` |
+| Hedera and facilitator discovery | `packages/hedera/src/` |
+| HCS codec, topics, Mirror Node, escrow calls | `packages/hcs/src/` |
+| Deterministic rules and shared records | `packages/types/src/` |
+| Human-root verification and majority adjudication | `packages/agent/src/` |
+| File-backed content addressed by SHA-256 | `packages/content/` and `services/content/` |
+| Bonded dispute intake and Mirror verification | `services/disputes/` |
+| Reference providers and checker endpoint | `services/providers/` |
+| Settlement state and HCS receipts | `services/settlement/src/service.ts` |
+| Independent replay | `packages/replay/` |
+| Graph client and routing | `packages/indexer/` |
+| Public explorer HTTP API | `apps/explorer/` |
+
+## Local checks
+
+Requirements: Node.js 22+, npm, and Foundry only for Solidity commands.
 
 ```sh
 cp .env.example .env
 npm install
 npm run build
 npm test
+npm run typecheck
+```
+
+The repository has no testnet dependency for these checks. A funded Hedera account is needed only for commands that create topics, deploy escrow, stake, post bonds, or settle a real payment.
+
+## Configure runtime discovery
+
+`npm run discover` calls the configured facilitator `/supported` endpoint. It records the observed x402 version, Hedera network, scheme, and fee payer in the ignored `artifacts/capabilities.json` file and fails if the required capability is absent.
+
+```sh
 npm run discover
 ```
 
-`npm run discover` calls the configured facilitator's `/supported` endpoint and writes the observed response to `artifacts/capabilities.json`. The command rejects a facilitator that does not advertise the configured Hedera network, `exact` scheme, protocol version, and fee-payer signer.
-
-After the buyer/operator account is funded and its credentials are in `.env`, `npm run provision:topics` creates or verifies the settlement and dispute HCS topics, then writes their IDs back to `.env`. Re-running the command verifies existing topics instead of creating duplicates.
-
-## Run a reference provider
-
-Set the provider variables from `.env.example`, then choose `PROVIDER_KIND=fx` or `PROVIDER_KIND=entity` and run:
+The operator account needs testnet HBAR before running the following command. It creates or verifies both HCS topics and writes the IDs to `.env`:
 
 ```sh
-npm --workspace @verity/providers start
+npm run provision:topics
 ```
 
-The provider returns a real x402 v2 challenge before delivery. `DEGRADE_MODE=true` requires `DEGRADED_FX_RATE` and changes the FX output on the real server path; it is not a test-only branch.
+No account ID, key, topic ID, price, or URL is embedded in the source. Values come from `.env` or the facilitator response.
 
-## Replay
+## Run the reference services
 
-After a dispute record and its content references exist on the configured topic and content store:
+Set `CONTENT_STORE_PUBLIC_URL` and `CONTENT_STORE_BASE_URL` to the reachable URL of the content process, then start it:
 
 ```sh
-npx verity replay <disputeId>
+npm run content:start
 ```
 
-The command reads only Mirror Node and the configured content store, then exits non-zero if the locally recomputed verdict differs from the recorded verdict.
+The content service stores canonical JSON at `PUT /content/<sha256>` and serves it at `GET /content/<sha256>`. It writes the bytes to `CONTENT_STORE_DIR`, verifies the hash on every read, and never writes response bodies to HCS.
 
-## Live demo command
+The provider process serves the paid endpoint and an unauthenticated deterministic checker endpoint. Start one process per provider or checker, with separate ports and processes:
 
-With funded Hedera credentials, configured HCS topics, and a running provider:
+```sh
+PROVIDER_KIND=fx PORT=3101 npm --workspace @verity/providers start
+PROVIDER_KIND=fx PORT=3102 DEGRADE_MODE=true DEGRADED_FX_RATE=0.50 npm --workspace @verity/providers start
+PROVIDER_KIND=fx PORT=3103 npm --workspace @verity/providers start
+```
+
+The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker endpoint is `POST /check` with `{ "ruleId": "...", "value": { ... } }`. The provider process validates inputs and returns the same deterministic verdict used by the buyer.
+
+The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the provider registry, and the Mirror Node URL. For three local FX checker processes, set:
+
+```sh
+DISPUTE_CHECKERS_JSON='[{"id":"fx-a","url":"http://127.0.0.1:3101/check"},{"id":"fx-b","url":"http://127.0.0.1:3102/check"},{"id":"fx-c","url":"http://127.0.0.1:3103/check"}]'
+npm run disputes:start
+```
+
+The service accepts `POST /disputes` and requires an idempotency key matching `disputeId`. It verifies the bond through Mirror Node before reading content or running adjudication.
+
+## Escrow and provider stake
+
+Compile and deploy the contract only after setting the minimum bond and gas in `.env`:
+
+```sh
+npm run contracts:test
+npm run contracts:build
+npm run contracts:deploy
+```
+
+The deploy command writes the returned Hedera contract ID to `VERITY_ESCROW_CONTRACT_ID`. Fund the separate provider account before staking, then run:
+
+```sh
+npm run stake:provider
+```
+
+The script writes a provider record to `VERITY_PROVIDER_REGISTRY_FILE` containing `providerId`, the verified human root, the staked amount, and the provider EVM address. A provider record is not accepted by the dispute service unless all four values validate.
+
+## Paid request and replay
+
+Configure `VERITY_DEMO_PROVIDER_URL`, the matching rule and expected value, provider/buyer IDs, and the HCS topics. Then run:
 
 ```sh
 npm run demo
 ```
 
-The demo uses the SDK buyer, evaluates the delivered response locally, settles only an accepted verdict, and records the accepted settlement through the HCS-backed coordinator. Missing credentials or topics fail loudly.
+The buyer calls the provider, receives the response, evaluates it locally, and settles an accepted response through the settlement coordinator. A successful run prints the facilitator transaction ID and HCS transaction ID. Those IDs can be opened using the configured HashScan testnet base URL.
 
-The bond/stake escrow contract is tested with `npm run contracts:test`. It accepts funds only through explicit payable methods; a plain native transfer reverts because it would not execute contract logic on Hedera.
+For a rejected response, the buyer additionally needs a World ID proof, `VERITY_DISPUTE_URL`, a positive bond, three content references for the checker responses, the escrow contract settings, and a running dispute service. The rejection path posts the bond before it sends the dispute request. There is no local identity substitute in the live path.
 
-To deploy the escrow from the compiled artifact, set `VERITY_ESCROW_MINIMUM_BOND` and `VERITY_ESCROW_GAS` in `.env`, run `npm run contracts:build`, then run `npm run contracts:deploy`. The command writes the returned contract ID to `.env` and refuses to overwrite an existing configured deployment.
+After a dispute receipt is visible on the configured topic:
 
-## Design constraints
+```sh
+npx verity replay <disputeId>
+```
 
-- Settlement is conditional on a deterministic verdict. A model may produce an input claim, but it cannot decide whether money moves.
-- HCS records contain compact hashes and identifiers, never response bodies.
-- Every network-facing value comes from configuration or runtime discovery.
-- An error includes the corrective action. A missing environment variable is not replaced with a default.
+Replay reads the dispute record from Mirror Node, fetches the evaluation input by its recorded SHA-256, verifies the bytes, runs the published rule locally, prints both verdicts, and exits non-zero on mismatch. It does not use the dispute database or a Verity service.
 
-## Scope
+## Public records
 
-The first reference services are an FX-rate lookup and an entity-resolution lookup. Both have a mechanical comparison rule. Subjective prose generation is deliberately excluded.
+The settlement topic is configured by `HCS_SETTLEMENT_TOPIC_ID`; the dispute topic is configured by `HCS_DISPUTE_TOPIC_ID`. Each disputed result produces three compact HCS messages with the same timestamp:
 
-## Honest status
+1. `dispute`: parties, roots, rule, content hashes, votes, amounts, and final resolution.
+2. `verdict`: the rule and compact checker votes.
+3. `bond`: bond, stake, reputation, and payment transaction IDs.
 
-No live settlement transaction, escrow contract, production World ID root registry, hosted Graph deployment, or external provider integration is claimed by this repository yet. Those claims require their corresponding testnet transaction IDs, hosted query evidence, or named third-party endpoint before they belong in the README.
+No live contract address, topic ID, or replayable dispute ID is claimed in this repository yet. Once testnet deployment is run, add the returned IDs and direct HashScan links here before presenting the project.
+
+## Hedera-specific rationale
+
+The resource server delivers before settlement, so the payment hold must survive evaluation inside a live HTTP request. Hedera's fast consensus and predictable low fees are important because the evaluator and checker quorum must finish before the signed transfer expires, while false-rejection adjudication must cost less than the trade. HCS provides an independently readable receipt stream, HTS is reserved for a future settlement-asset path, and Mirror Node is the read authority for reconciliation and replay. The mechanism is not merely an API wrapper: removing fast finality, low fixed fees, or the HCS audit stream weakens the economic and trust model.
+
+## Extra capability map
+
+| Capability | Evidence in this repository | Current status |
+| --- | --- | --- |
+| Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; needs a live testnet run |
+| HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; needs provisioned topics |
+| Mirror Node replay | `packages/replay/src/index.ts:1` | Implemented and tested |
+| Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Implemented; needs deployment and funded accounts |
+| Proof of Human root | `packages/agent/src/identity.ts:1` | Adapter implemented; World credentials/config required |
+| Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor implemented; public score indexing remains |
+| Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1` | Client interface only; hosted deployment remains |
+| Scheduled transactions | — | Not implemented |
+| HTS custom fee settlement asset | — | Not implemented |
+| ERC-8004/HCS-14 registry | — | Not implemented |
+
+## Limitations
+
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted subgraph or Substreams deployment in this repository. World ID verification requires the operator's configured endpoint and action. External provider adoption, live contract IDs, HCS IDs, and real dispute IDs are intentionally absent until they are produced by testnet runs rather than documentation.
+
+## Adoption
+
+`ADOPTION.md` tracks third-party services only after their operators run their own process with the SDK and provide a reachable endpoint. No external team is represented as integrated yet.
