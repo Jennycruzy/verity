@@ -63,7 +63,7 @@ export function createProviderHandler(config: ProviderServiceConfig) {
         description: config.kind === "fx" ? "Verity FX rate lookup" : "Verity entity resolution lookup"
       });
       await protectedHandler(
-        { method: request.method ?? "GET", url: request.url ?? "/", headers: request.headers },
+        { method: request.method ?? "GET", url: request.url ?? "/", headers: request.headers, raw: request },
         response
       );
     } catch (error) {

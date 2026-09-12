@@ -46,7 +46,8 @@ const protectedApp = protect(app, { price: "100", verifier: "fx-rate-v1" });
 createServer((request, response) => protectedApp({
   method: request.method ?? "GET",
   url: request.url ?? "/fx",
-  headers: request.headers
+  headers: request.headers,
+  raw: request
 }, response)).listen(3000);
 ```
 
@@ -138,6 +139,22 @@ The quorum can include the separate Go implementation in `services/checker-go`, 
 When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC8004_AGENT_ID` are set, the provider also serves `GET /.well-known/agent-registration.json` with its x402 resource, checker, and registry references.
 
 The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live Graph endpoint and query files configured, `npm run graph:mcp` exposes provider reliability and buyer honesty as MCP tools. The Graph transport requires an x402 challenge and settles the query before returning data.
+
+The Graph data path is implemented as an address-filtered Substreams package feeding an Agent0-compatible Subgraph. Configure the Base Sepolia RPC and current ERC-8004 identity and reputation registries, then build both artifacts:
+
+```sh
+npm run graph:build
+```
+
+`graph:build` verifies live registry bytecode, discovers the chain ID, packs the filtered stream, generates the Subgraph manifest, and compiles its mapping. Deploy the generated `graph/subgraph/build/` artifact through Subgraph Studio and set `GRAPH_SUBGRAPH_URL` to the resulting query endpoint. This local build does not count as hosted evidence; the README will only claim that after a successful Studio deployment.
+
+The paid query service keeps the hosted Graph credential on the server and exposes a read-only x402 resource at `POST /query`:
+
+```sh
+npm run graph:gateway
+```
+
+Set `GRAPH_GATEWAY_PRICE` and `GRAPH_GATEWAY_UPSTREAM_API_KEY` first. The service rejects mutations, subscriptions, oversized bodies, invalid upstream JSON, and upstream timeouts. Point the buying agent's `GRAPH_SUBGRAPH_URL` at this public `/query` URL so reputation lookup is a real paid dependency rather than decorative data access.
 
 With the same Graph configuration, start the public explorer with `npm --workspace @verity/explorer start`. Open `http://127.0.0.1:8787/` to query provider reliability or buyer honesty. The browser page and JSON routes both call `GraphReputationClient`; there is no parallel local reputation database.
 
@@ -250,14 +267,14 @@ The resource server delivers before settlement, so the payment hold must survive
 | Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed on testnet; provider stake remains to be posted |
 | Proof of Human root | `packages/agent/src/identity.ts:1` | Adapter implemented; World credentials/config required |
 | Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor deployed; public score indexing remains |
-| Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
+| Graph composition and MCP/SKILL tooling | `graph/substreams/substreams.yaml.template:1`, `graph/subgraph/subgraph.yaml.template:1`, `services/graph-gateway/src/app.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Substreams and Subgraph compile locally; paid query service, routing, MCP handler, and reusable skill implemented; hosted deployment remains |
 | Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88`, `packages/hcs/src/escrow.ts:42`, and `packages/sdk/src/buy.ts:1` | Expiring bonds, wait-for-expiry scheduling, and SDK wiring implemented; needs a live testnet run |
 | HTS custom fee settlement asset | `packages/hcs/src/token.ts:1` and `scripts/provision-token.ts:1` | Optional provisioning, association assertions, metadata checks, and same-token fee implemented; needs a live testnet run |
 | ERC-8004/HCS-14 registry | `packages/indexer/src/identity-registry.ts:1` and `scripts/register-erc8004.ts:1` | Live EVM registration, URI verification, and resumable transaction recording implemented; requires operator RPC/config and one real registry transaction |
 
 ## Limitations
 
-Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. ERC-8004 registration is wired to the published EVM registry interface but still requires an operator-supplied RPC URL, registry reference, provider signer balance, and live registration transaction. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption and a real replayable dispute remain outstanding.
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, and content storage is file-backed. The Substreams package and Subgraph compile locally but are not yet hosted by a Graph provider, so no live Graph endpoint is claimed. ERC-8004 registration is wired to the published EVM registry interface but still requires an operator-supplied RPC URL, registry reference, provider signer balance, and live registration transaction. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption and a real replayable dispute remain outstanding.
 
 ## Adoption
 
