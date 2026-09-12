@@ -23,6 +23,7 @@
     "register:provider": "tsx scripts/register-provider.ts",
     "register:erc8004": "tsx scripts/register-erc8004.ts",
     "register:graph-agent": "tsx scripts/register-graph-agent.ts",
+    "provision:graph-signers": "node --import tsx scripts/provision-graph-signers.ts",
     "register:agent": "tsx scripts/register-agent.ts",
     "publish:agent0-feedback": "tsx scripts/publish-agent0-feedback.ts",
     "graph:prepare": "tsx scripts/prepare-graph.ts",

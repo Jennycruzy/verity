@@ -150,6 +150,8 @@ npm run graph:build
 
 `graph:build` verifies live registry bytecode, discovers the chain ID, packs the filtered stream, generates the Subgraph manifest, and compiles its mapping. Create the Subgraph in Studio, then set `GRAPH_STUDIO_SUBGRAPH`, `GRAPH_STUDIO_DEPLOY_KEY`, and a new `GRAPH_STUDIO_VERSION_LABEL`. Run `npm run graph:deploy` and set `GRAPH_SUBGRAPH_URL` to the resulting query endpoint. The deploy key is passed only to the official CLI and is redacted from command errors. No blockchain funding is needed to deploy the Subgraph; Graph Studio access is required. This local build does not count as hosted evidence; the README will only claim that after a successful Studio deployment.
 
+The Graph feedback publisher needs separate Base Sepolia signers for the provider and buyer. Generate them locally once with `npm run provision:graph-signers`; only public addresses are printed and the keys are written to ignored `.env`. Fund both printed addresses with Base Sepolia ETH before `npm run register:graph-agent -- provider` and `npm run register:graph-agent -- buyer`.
+
 The paid query service keeps the hosted Graph credential on the server and exposes a read-only x402 resource at `POST /query`:
 
 ```sh
