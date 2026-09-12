@@ -153,6 +153,32 @@ export function evaluateEntity(observation: EntityObservation): DeterministicVer
   };
 }
 
+export function resolveDisputeVerdict(
+  ruleId: RuleId,
+  buyerVerdict: Verdict,
+  checkerMajority: Verdict,
+  checkerCount: number
+): DeterministicVerdict {
+  if (buyerVerdict !== "reject") {
+    throw new Error("VERITY_DISPUTE_BUYER_VERDICT_INVALID: only a rejected buyer response can enter adjudication");
+  }
+  if (checkerCount < 3 || checkerCount % 2 === 0) {
+    throw new Error("VERITY_CHECKER_QUORUM: provide an odd number of at least three cross-checkers");
+  }
+  const providerWasWrong = checkerMajority === "accept";
+  return {
+    verdict: providerWasWrong ? "reject" : "accept",
+    ruleId,
+    reasonCode: providerWasWrong ? "CHECKER_MAJORITY_UPHOLDS_REJECTION" : "CHECKER_MAJORITY_OVERTURNS_REJECTION",
+    evidence: {
+      buyerVerdict,
+      checkerMajority,
+      checkerCount,
+      majorityRule: "strict-majority"
+    }
+  };
+}
+
 export function stableJson(value: unknown): string {
   return stableJsonValue(value, "$", new WeakSet<object>());
 }

@@ -16,8 +16,8 @@ const checkers: CrossChecker[] = [
 test("adjudicates a bonded rejection and records the complete result", async () => {
   const stored: unknown[] = [];
   const checkedValues: unknown[] = [];
-  const submission = submissionForTest();
-  const providerValues = [{ rate: "1.10" }, { rate: "1.10" }, { rate: "1.00" }];
+  const submission = submissionForTest({ providerResponses: ['{"rate":"1.00"}', '{"rate":"1.00"}', '{"rate":"1.00"}'] });
+  const providerValues = [{ rate: "1.00" }, { rate: "1.00" }, { rate: "1.00" }];
   const evaluatingCheckers: CrossChecker[] = ["checker-a", "checker-b", "checker-c"].map((id) => ({
     id,
     check: async ({ value }) => evaluateFxRate(value as { expectedRate: string; actualRate: string; toleranceBps: number })
@@ -32,6 +32,7 @@ test("adjudicates a bonded rejection and records the complete result", async () 
   const content: ContentStore = {
     putJson: async () => ref(JSON.stringify(input)),
     readJson: async (reference) => {
+      if (reference.sha256 === submission.buyerResponse.sha256) return { rate: "1.10" };
       const index = submission.providerResponses.findIndex((candidate) => candidate.sha256 === reference.sha256);
       return index >= 0 ? providerValues[index] : input;
     }
@@ -59,14 +60,47 @@ test("adjudicates a bonded rejection and records the complete result", async () 
   assert.equal(first.result.state, "void");
   assert.equal(first.result.votes.length, 3);
   assert.deepEqual(checkedValues, [
-    { expectedRate: "1.00", actualRate: "1.10", toleranceBps: 100 },
-    { expectedRate: "1.00", actualRate: "1.10", toleranceBps: 100 },
+    { expectedRate: "1.00", actualRate: "1.00", toleranceBps: 100 },
+    { expectedRate: "1.00", actualRate: "1.00", toleranceBps: 100 },
     { expectedRate: "1.00", actualRate: "1.00", toleranceBps: 100 }
   ]);
   assert.equal(stored.length, 1);
   const retry = await processor.submit(submission);
   assert.equal(retry.created, false);
   assert.deepEqual(retry.result, first.result);
+});
+
+test("overturns a dishonest rejection when competing providers reject", async () => {
+  const stored: unknown[] = [];
+  const dishonestInput = { actualRate: "1.08", expectedRate: "1.10", toleranceBps: 25, rate: "1.08" };
+  const serializedInput = JSON.stringify(dishonestInput);
+  const submission = submissionForTest({ input: dishonestInput, buyerResponse: '{"rate":"1.08"}', providerResponses: ['{"rate":"1.08"}', '{"rate":"1.08"}', '{"rate":"1.08"}'] });
+  const content: ContentStore = {
+    putJson: async () => ref(serializedInput),
+    readJson: async (reference) => reference.sha256 === submission.evaluationInput.sha256 ? dishonestInput : { rate: "1.08" }
+  };
+  const settlement = {
+    recordAdjudication: async () => {
+      stored.push(true);
+      return { state: "settled" as const, hcsTransactionId: "hcs-2", transactionId: "settlement-2" };
+    }
+  };
+  const processor = new DisputeProcessor(
+    { verify: async () => ({ root: "buyer-root", action: "dispute", verifiedAt: "now", provider: "world-id" as const }) },
+    new MemoryProviderRegistry(new Map([["provider-1", { providerRoot: "provider-root", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` }]])),
+    content,
+    checkers,
+    settlement,
+    { verify: async () => undefined },
+    new MemoryDisputeStore()
+  );
+
+  const result = await processor.submit(submission);
+
+  assert.equal(result.result.verdict.verdict, "accept");
+  assert.equal(result.result.verdict.reasonCode, "CHECKER_MAJORITY_OVERTURNS_REJECTION");
+  assert.equal(result.result.state, "settled");
+  assert.equal(stored.length, 1);
 });
 
 test("rejects a conflicting retry and missing providers", async () => {
@@ -143,8 +177,15 @@ test("requires one provider response reference per checker", async () => {
   await assert.rejects(processor.submit({ ...submissionForTest(), providerResponses: [] }), /VERITY_PROVIDER_RESPONSES/);
 });
 
-function submissionForTest(): DisputeSubmission {
-  const serialized = JSON.stringify(input);
+function submissionForTest(options: {
+  input?: typeof input;
+  buyerResponse?: string;
+  providerResponses?: readonly string[];
+} = {}): DisputeSubmission {
+  const submissionInput = options.input ?? input;
+  const serialized = JSON.stringify(submissionInput);
+  const buyerResponse = options.buyerResponse ?? '{"rate":"1.10"}';
+  const providerResponses = options.providerResponses ?? ['{"rate":"1.10"}', '{"rate":"1.10"}', '{"rate":"1.00"}'];
   return {
     disputeId: "dispute-1",
     requestId: "request-1",
@@ -159,7 +200,7 @@ function submissionForTest(): DisputeSubmission {
     buyerBondAmount: "10",
     bondTransactionId: "0.0.9@1.000000000",
     evaluationInput: ref(serialized),
-    buyerResponse: ref('{"rate":"1.10"}'),
-    providerResponses: [ref('{"rate":"1.10"}'), ref('{"rate":"1.10"}'), ref('{"rate":"1.00"}')]
+    buyerResponse: ref(buyerResponse),
+    providerResponses: providerResponses.map(ref)
   };
 }

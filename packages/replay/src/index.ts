@@ -1,5 +1,5 @@
 import { readTopicRecords } from "@verity/hcs";
-import { evaluateEntity, evaluateFxRate, RULE_IDS, sha256, type ContentHashReference, type DisputeRecord, type RuleId, type Verdict } from "@verity/types";
+import { evaluateEntity, evaluateFxRate, resolveDisputeVerdict, RULE_IDS, sha256, type ContentHashReference, type DisputeRecord, type RuleId, type Verdict } from "@verity/types";
 
 export interface ReplayConfig {
   readonly mirrorNodeBaseUrl: string;
@@ -57,7 +57,8 @@ export async function replayDispute(disputeId: string, config: ReplayConfig, opt
       reasonCode: verdict.reasonCode
     };
   });
-  const replayed = majority(providerVotes.map((vote) => vote.verdict), dispute.ruleId);
+  const checkerMajority = majority(providerVotes.map((vote) => vote.verdict), dispute.ruleId);
+  const replayed = resolveDisputeVerdict(dispute.ruleId, buyerVerdict.verdict, checkerMajority.verdict, providerVotes.length);
   const recordedVotesMatch = providerVotes.every((vote, index) => {
     const recordedVote = dispute.crossCheckerVerdicts[index];
     return recordedVote?.checkerId === vote.checkerId && recordedVote.verdict === vote.verdict;

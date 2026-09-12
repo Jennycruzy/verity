@@ -1,7 +1,7 @@
 import { adjudicate, requireDisputeEligibility, type CrossChecker, type VerifiedRoot, type WorldIdProof } from "@verity/agent";
 import type { ContentStore } from "@verity/content";
 import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
-import { sha256, stableJson, RULE_IDS, type ContentReference, type CrossCheckerVerdict, type DeterministicVerdict, type RuleId } from "@verity/types";
+import { evaluateEntity, evaluateFxRate, resolveDisputeVerdict, sha256, stableJson, RULE_IDS, type ContentReference, type CrossCheckerVerdict, type DeterministicVerdict, type RuleId } from "@verity/types";
 import type { DisputeResolutionRequest, SettlementOutcome, SettlementCoordinator } from "@verity/settlement";
 import type { BondVerifier } from "./bond.js";
 import { MemoryDisputeStore, type DisputeStore, type StoredDispute } from "./store.js";
@@ -146,6 +146,10 @@ export class DisputeProcessor {
     const evaluationInput = await this.content.readJson(submission.evaluationInput);
     const buyerResponse = await this.content.readJson(submission.buyerResponse);
     validateBuyerResponse(submission.ruleId, evaluationInput, buyerResponse);
+    const buyerVerdict = evaluateBuyerResponse(submission.ruleId, evaluationInput);
+    if (buyerVerdict.verdict !== "reject") {
+      throw new DisputeInputError("VERITY_DISPUTE_NOT_REJECTED: adjudication requires a buyer response that fails its published rule");
+    }
     const providerResponses = await Promise.all(submission.providerResponses.map((reference) => this.content.readJson(reference)));
     const buyer = await this.identity.verify(submission.identityProof, submission.identitySignal);
     const eligibility = requireDisputeEligibility(buyer, submission.buyerBondAmount);
@@ -157,7 +161,7 @@ export class DisputeProcessor {
       })
     }));
     const adjudication = await adjudicate({ ruleId: submission.ruleId, value: evaluationInput }, boundCheckers);
-    const verdict = majorityVerdict(submission.ruleId, adjudication.verdict, adjudication.votes.length);
+    const verdict = resolveDisputeVerdict(submission.ruleId, buyerVerdict.verdict, adjudication.verdict, adjudication.votes.length);
     const request: DisputeResolutionRequest = {
       requestId: submission.requestId,
       providerId: submission.providerId,
@@ -201,15 +205,6 @@ export class DisputeProcessor {
   }
 }
 
-function majorityVerdict(ruleId: RuleId, verdict: "accept" | "reject", checkerCount: number): DeterministicVerdict {
-  return {
-    verdict,
-    ruleId,
-    reasonCode: verdict === "reject" ? "CHECKER_MAJORITY_REJECT" : "CHECKER_MAJORITY_ACCEPT",
-    evidence: { checkerCount, ruleId, majorityRule: "strict-majority" }
-  };
-}
-
 function validateSubmission(value: DisputeSubmission, checkerCount: number): void {
   if (!value.disputeId.trim() || !value.requestId.trim() || !value.providerId.trim() || !value.buyerId.trim()) {
     throw new DisputeInputError("VERITY_DISPUTE_FIELDS_REQUIRED: disputeId, requestId, providerId, and buyerId are required");
@@ -229,6 +224,23 @@ function validateSubmission(value: DisputeSubmission, checkerCount: number): voi
     throw new DisputeInputError(`VERITY_PROVIDER_RESPONSES: expected one response reference for each of the ${checkerCount} configured checkers`);
   }
   for (const reference of value.providerResponses) validateReference(reference, "providerResponses");
+}
+
+function evaluateBuyerResponse(ruleId: RuleId, evaluationInput: unknown): DeterministicVerdict {
+  if (!isRecord(evaluationInput)) {
+    throw new DisputeInputError(`VERITY_BUYER_RESPONSE_INVALID: ${ruleId} evaluation input must be a JSON object`);
+  }
+  if (ruleId === RULE_IDS.fxRate) {
+    return evaluateFxRate({
+      expectedRate: requiredResponseString(evaluationInput.expectedRate, "evaluationInput.expectedRate"),
+      actualRate: requiredResponseString(evaluationInput.actualRate, "evaluationInput.actualRate"),
+      toleranceBps: requiredResponseInteger(evaluationInput.toleranceBps, "evaluationInput.toleranceBps")
+    });
+  }
+  return evaluateEntity({
+    expected: requiredResponseString(evaluationInput.expected, "evaluationInput.expected"),
+    actual: requiredResponseString(evaluationInput.actual, "evaluationInput.actual")
+  });
 }
 
 function validateReference(value: ContentReference, name: string): void {

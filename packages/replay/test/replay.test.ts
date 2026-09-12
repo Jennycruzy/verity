@@ -10,7 +10,7 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
   const inputHash = sha256(inputSerialized);
   const buyerResponse = JSON.stringify({ rate: "1.10" });
   const buyerResponseHash = sha256(buyerResponse);
-  const providerResponses = [JSON.stringify({ rate: "1.10" }), JSON.stringify({ rate: "1.10" }), JSON.stringify({ rate: "1.00" })];
+  const providerResponses = [JSON.stringify({ rate: "1.00" }), JSON.stringify({ rate: "1.00" }), JSON.stringify({ rate: "1.00" })];
   const providerResponseHashes = providerResponses.map(sha256);
   const record = {
     schema: HCS_SCHEMA,
@@ -25,8 +25,8 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
       buyerResponse: { sha256: buyerResponseHash },
       providerResponses: providerResponseHashes.map((sha256) => ({ sha256 })),
       crossCheckerVerdicts: [
-        { checkerId: "checker-a", verdict: "reject" as const },
-        { checkerId: "checker-b", verdict: "reject" as const },
+        { checkerId: "checker-a", verdict: "accept" as const },
+        { checkerId: "checker-b", verdict: "accept" as const },
         { checkerId: "checker-c", verdict: "accept" as const }
       ]
     }
@@ -51,8 +51,8 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
     replayedVerdict: "reject",
     buyerVerdict: "reject",
     providerVotes: [
-      { checkerId: "checker-a", verdict: "reject", reasonCode: "RATE_OUTSIDE_TOLERANCE" },
-      { checkerId: "checker-b", verdict: "reject", reasonCode: "RATE_OUTSIDE_TOLERANCE" },
+      { checkerId: "checker-a", verdict: "accept", reasonCode: "RATE_WITHIN_TOLERANCE" },
+      { checkerId: "checker-b", verdict: "accept", reasonCode: "RATE_WITHIN_TOLERANCE" },
       { checkerId: "checker-c", verdict: "accept", reasonCode: "RATE_WITHIN_TOLERANCE" }
     ],
     recordedVotesMatch: true,
