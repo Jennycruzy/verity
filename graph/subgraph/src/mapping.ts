@@ -147,6 +147,8 @@ function handleRegistered(
   }
   agent.owner = addressFromTopic(event.topics[2])
   agent.agentURI = decodeSingleString(event.data)
+  const registrationRoot = extractHumanRoot(agent.agentURI)
+  if (registrationRoot !== null) agent.humanRoot = registrationRoot
   agent.updatedAt = timestamp
   agent.lastActivity = timestamp
   agent.save()
@@ -182,6 +184,8 @@ function handleNewFeedback(
   const agentId = bigEndianUnsigned(event.topics[1])
   const agentEntityId = agentKey(chainId, agentId)
   const agent = loadOrCreateAgent(agentEntityId, chainId, agentId, timestamp)
+  const humanRoot = extractHumanRoot(feedback.feedbackURI)
+  if (humanRoot !== null) agent.humanRoot = humanRoot
   const clientAddress = addressFromTopic(event.topics[2])
   const feedbackId = `${agentEntityId}:${clientAddress.toHexString()}:${feedback.feedbackIndex.toString()}`
   const record = new Feedback(feedbackId)
@@ -386,6 +390,19 @@ function hexBytes(value: string): Bytes {
 
 function agentKey(chainId: BigInt, agentId: BigInt): string {
   return `${chainId.toString()}:${agentId.toString()}`
+}
+
+function extractHumanRoot(uri: string): string | null {
+  const marker = "#verity-human-root="
+  const start = uri.indexOf(marker)
+  if (start < 0) return null
+  const value = uri.substring(start + marker.length)
+  if (value.length === 0) return null
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    if (code < 48 || code > 57) return null
+  }
+  return value
 }
 
 function ensure(condition: bool, message: string): void {

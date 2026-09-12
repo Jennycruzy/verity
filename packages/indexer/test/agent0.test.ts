@@ -55,6 +55,21 @@ test("derives buyer honesty from the standard Agent0 response", () => {
   assert.deepEqual(result, { root: "eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e:9", honestyScore: 0.5, disputes: 2 });
 });
 
+test("derives buyer honesty by the Verity human root extension", () => {
+  const result = parseAgent0Buyer({
+    agents: [{
+      id: "84532:9",
+      humanRoot: "123456789",
+      feedback: [
+        { value: "1", tag1: VERITY_BUYER_FEEDBACK_TAG, isRevoked: false },
+        { value: "1", tag1: VERITY_BUYER_FEEDBACK_TAG, isRevoked: false },
+        { value: "0", tag1: VERITY_BUYER_FEEDBACK_TAG, isRevoked: false }
+      ]
+    }]
+  }, "123456789");
+  assert.deepEqual(result, { root: "123456789", honestyScore: 0.6666666666666666, disputes: 3 });
+});
+
 test("rejects a standard Agent0 buyer with an invalid score", () => {
   assert.throws(() => parseAgent0Buyer({ id: "84532:9", feedback: [{ value: "1.1", tag1: VERITY_BUYER_FEEDBACK_TAG, isRevoked: false }] }, "84532:9"), /values must be between 0 and 1/);
 });

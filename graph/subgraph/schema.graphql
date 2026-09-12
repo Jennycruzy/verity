@@ -10,6 +10,9 @@ type Agent @entity(immutable: false) {
   agentId: BigInt!
   owner: Bytes
   agentURI: String
+  # Verity extension: a buyer's World ID nullifier root. The Agent and
+  # Feedback entities remain the ERC-8004-compatible source of reputation.
+  humanRoot: String
   registrationFile: AgentRegistrationFile
   feedback: [Feedback!]! @derivedFrom(field: "agent")
   totalFeedback: BigInt!
@@ -44,4 +47,3 @@ type AgentRegistrationFile @entity(immutable: true) {
   rawURI: String!
   createdAt: BigInt!
 }
-

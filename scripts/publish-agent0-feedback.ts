@@ -70,7 +70,8 @@ async function publish(disputeId: string): Promise<void> {
       subject: "buyer",
       agentRegistry: identityRegistry,
       agentId: buyerAgentId,
-      outcome: buyerWasHonest
+      outcome: buyerWasHonest,
+      humanRoot: dispute.buyerRoot
     });
 
     const providerFeedback = await buyerClient.giveProviderFeedback({
@@ -112,6 +113,7 @@ function feedbackEvidence(input: {
   readonly agentRegistry: string;
   readonly agentId: string;
   readonly outcome: boolean;
+  readonly humanRoot?: string;
 }): { readonly feedbackURI: string; readonly feedbackHash: string } {
   const document = stableJson({
     schema: "verity/agent0-feedback/v1",
@@ -126,18 +128,22 @@ function feedbackEvidence(input: {
     outcome: input.outcome
   });
   const feedbackHash = keccak256(toUtf8Bytes(document));
-  const feedbackURI = `data:application/json;base64,${Buffer.from(document, "utf8").toString("base64")}`;
+  const rootFragment = input.humanRoot ? `#verity-human-root=${encodeURIComponent(input.humanRoot)}` : "";
+  const feedbackURI = `data:application/json;base64,${Buffer.from(document, "utf8").toString("base64")}${rootFragment}`;
   return { feedbackURI, feedbackHash };
 }
 
-function parseDispute(value: Record<string, unknown>, disputeId: string): { readonly ruleId: RuleId; readonly verdict: Verdict } {
+function parseDispute(value: Record<string, unknown>, disputeId: string): { readonly ruleId: RuleId; readonly verdict: Verdict; readonly buyerRoot: string } {
   if (typeof value.ruleId !== "string" || !isRuleId(value.ruleId)) {
     throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has an unsupported rule`);
   }
   if (value.verdict !== "accept" && value.verdict !== "reject") {
     throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has no final verdict`);
   }
-  return { ruleId: value.ruleId, verdict: value.verdict };
+  if (typeof value.buyerRoot !== "string" || !/^\d+$/.test(value.buyerRoot)) {
+    throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has no canonical buyer root`);
+  }
+  return { ruleId: value.ruleId, verdict: value.verdict, buyerRoot: value.buyerRoot };
 }
 
 function feedbackSummary(value: Erc8004FeedbackTransaction): Record<string, string> {

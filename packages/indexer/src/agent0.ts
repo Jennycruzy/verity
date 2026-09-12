@@ -10,6 +10,7 @@ interface Agent0Feedback {
 
 interface Agent0Agent {
   readonly id?: unknown;
+  readonly humanRoot?: unknown;
   readonly registrationFile?: unknown;
   readonly feedback?: unknown;
 }
@@ -36,16 +37,34 @@ export function parseAgent0Provider(value: unknown, requestedAgentId: string): P
 }
 
 export function parseAgent0Buyer(value: unknown, requestedRoot: string): BuyerReputation {
+  const agent = unwrapBuyerAgent(value, requestedRoot);
+  const feedback = readFeedback(agent.feedback);
+  const relevant = feedback.filter((entry) => entry.tag1 === VERITY_BUYER_FEEDBACK_TAG && entry.isRevoked === false);
+  const scoreKey = typeof agent.id === "string" ? agent.id : requestedRoot.trim();
+  return {
+    root: requestedRoot.trim(),
+    honestyScore: averageFeedback(relevant, scoreKey, "buyer"),
+    disputes: relevant.length
+  };
+}
+
+function unwrapBuyerAgent(value: unknown, requestedRoot: string): Agent0Agent {
+  if (!isRecord(value)) throw new Error("VERITY_AGENT0_BUYER_SCHEMA: response data must be an object");
+  if (Array.isArray(value.agents)) {
+    if (value.agents.length !== 1 || !isRecord(value.agents[0])) {
+      throw new Error(`VERITY_AGENT0_BUYER_SCHEMA: no Agent is indexed for human root ${requestedRoot}`);
+    }
+    const agent = value.agents[0] as Agent0Agent;
+    if (agent.humanRoot !== requestedRoot) {
+      throw new Error(`VERITY_AGENT0_BUYER_SCHEMA: response root ${String(agent.humanRoot)} does not match ${requestedRoot}`);
+    }
+    return agent;
+  }
+
   const agentId = normalizeAgent0Id(requestedRoot);
   const agent = unwrapAgent(value);
   if (agent.id !== agentId) throw new Error(`VERITY_AGENT0_BUYER_SCHEMA: response identified ${String(agent.id)} instead of ${agentId}`);
-  const feedback = readFeedback(agent.feedback);
-  const relevant = feedback.filter((entry) => entry.tag1 === VERITY_BUYER_FEEDBACK_TAG && entry.isRevoked === false);
-  return {
-    root: requestedRoot.trim(),
-    honestyScore: averageFeedback(relevant, agentId, "buyer"),
-    disputes: relevant.length
-  };
+  return agent;
 }
 
 function unwrapAgent(value: unknown): Agent0Agent {

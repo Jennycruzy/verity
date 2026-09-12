@@ -51,7 +51,7 @@ export class GraphReputationClient implements ReputationClient {
   }
 
   public async buyer(root: string): Promise<BuyerReputation> {
-    const queryAgentId = this.queries.buyer.format === "agent0-v1" ? normalizeAgent0Id(root) : undefined;
+    const queryAgentId = this.queries.buyer.format === "agent0-v1" && isAgent0Id(root) ? normalizeAgent0Id(root) : undefined;
     const body = await this.execute(this.queries.buyer, { root, ...(queryAgentId ? { agentId: queryAgentId } : {}) });
     return this.queries.buyer.format === "agent0-v1"
       ? parseAgent0Buyer(body, root)
@@ -81,6 +81,10 @@ export class GraphReputationClient implements ReputationClient {
     if (Array.isArray(errors) && errors.length > 0) throw new Error(`VERITY_GRAPH_QUERY: ${JSON.stringify(errors)}`);
     return (value as { data?: unknown }).data;
   }
+}
+
+function isAgent0Id(value: string): boolean {
+  return /^(?:\d+:\d+|eip155:\d+:0x[0-9a-fA-F]{40}:\d+)$/.test(value.trim());
 }
 
 export interface X402GraphPaymentConfig {
