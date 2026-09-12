@@ -169,6 +169,7 @@ export class SettlementCoordinator {
         crossCheckerVerdicts: request.crossCheckerVerdicts.map((vote) => ({ checkerId: vote.checkerId, verdict: vote.verdict })),
         verdict: request.verdict.verdict,
         buyerBondAmount: request.buyerBondAmount,
+        ...(request.bondTransactionId ? { bondTransactionId: request.bondTransactionId } : {}),
         ...(request.bondScheduleId ? { bondScheduleId: request.bondScheduleId } : {}),
         providerStakeAmount: request.providerStakeAmount,
         resolution: state

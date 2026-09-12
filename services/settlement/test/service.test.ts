@@ -104,6 +104,7 @@ function disputeRequest(verdict: "accept" | "reject") {
     providerRoot: "provider-root",
     verdict: { verdict, ruleId: "fx-rate-v1" as const, reasonCode: verdict === "reject" ? "RATE_OUTSIDE_TOLERANCE" : "RATE_WITHIN_TOLERANCE", evidence: {} },
     buyerBondAmount: "10",
+    bondTransactionId: "0.0.9@1.000000000",
     providerStakeAmount: "20",
     buyerAddress: `0x${"01".repeat(20)}`,
     providerAddress: `0x${"02".repeat(20)}`,
@@ -140,6 +141,7 @@ test("records a complete upheld dispute without settling the held payment", asyn
   assert.equal(result.transactionId, undefined);
   assert.equal(published.length, 3);
   assert.deepEqual((published[0] as { payload: { evaluationInput: unknown; resolution: string } }).payload.evaluationInput, { sha256: "input-hash" });
+  assert.equal((published[0] as { payload: { bondTransactionId: string } }).payload.bondTransactionId, "0.0.9@1.000000000");
   assert.equal((published[0] as { payload: { resolution: string } }).payload.resolution, "void");
 });
 
