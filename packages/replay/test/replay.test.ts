@@ -101,3 +101,32 @@ test("rejects a dispute record with duplicate checker identities", async () => {
     /VERITY_REPLAY_SCHEMA: dispute dispute-duplicate-checker did not contain the replay inputs/
   );
 });
+
+test("rejects multiple HCS records for one dispute ID", async () => {
+  const record = {
+    schema: HCS_SCHEMA,
+    kind: "dispute" as const,
+    id: "dispute-ambiguous",
+    recordedAt: "2026-09-11T00:00:00.000Z",
+    payload: {}
+  };
+  const encoded = Buffer.from(encodeHcsRecord(record)).toString("base64");
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url === "https://mirror.invalid/api/v1/topics/0.0.7/messages") {
+      return new Response(JSON.stringify({
+        messages: [
+          { consensus_timestamp: "1", sequence_number: 1, message: encoded },
+          { consensus_timestamp: "2", sequence_number: 2, message: encoded }
+        ],
+        links: { next: null }
+      }), { status: 200 });
+    }
+    throw new Error(`unexpected URL ${url}`);
+  };
+
+  await assert.rejects(
+    replayDispute("dispute-ambiguous", { mirrorNodeBaseUrl: "https://mirror.invalid", disputeTopicId: "0.0.7", contentStoreBaseUrl: "https://content.invalid" }, { fetchImpl }),
+    /VERITY_REPLAY_AMBIGUOUS: dispute dispute-ambiguous has 2 records/
+  );
+});

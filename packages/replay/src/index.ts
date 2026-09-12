@@ -30,10 +30,15 @@ export async function replayDispute(disputeId: string, config: ReplayConfig, opt
   if (!disputeId) throw new Error("VERITY_REPLAY_ID_MISSING: provide a dispute ID");
   const fetchImpl = options.fetchImpl ?? fetch;
   const records = await readTopicRecords(config.mirrorNodeBaseUrl, config.disputeTopicId, { fetchImpl });
-  const record = records.find((candidate) => candidate.kind === "dispute" && candidate.id === disputeId);
-  if (!record) {
+  const disputeRecords = records.filter((candidate) => candidate.kind === "dispute" && candidate.id === disputeId);
+  if (disputeRecords.length === 0) {
     throw new Error(`VERITY_REPLAY_NOT_FOUND: no dispute ${disputeId} was found on topic ${config.disputeTopicId}`);
   }
+  if (disputeRecords.length > 1) {
+    throw new Error(`VERITY_REPLAY_AMBIGUOUS: dispute ${disputeId} has ${disputeRecords.length} records on topic ${config.disputeTopicId}`);
+  }
+  const record = disputeRecords[0];
+  if (!record) throw new Error(`VERITY_REPLAY_NOT_FOUND: no dispute ${disputeId} was found on topic ${config.disputeTopicId}`);
 
   const dispute = parseDisputeRecord(record.payload, disputeId);
   const input = await fetchContent(dispute.evaluationInput, config.contentStoreBaseUrl, fetchImpl);
