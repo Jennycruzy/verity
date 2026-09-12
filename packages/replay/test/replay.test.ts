@@ -59,3 +59,45 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
     matches: true
   });
 });
+
+test("rejects a dispute record with duplicate checker identities", async () => {
+  const input = { actualRate: "1.00", expectedRate: "1.00", toleranceBps: 100 };
+  const inputSerialized = stableJson(input);
+  const inputHash = sha256(inputSerialized);
+  const buyerResponse = JSON.stringify({ rate: "1.00" });
+  const buyerResponseHash = sha256(buyerResponse);
+  const providerResponses = [JSON.stringify({ rate: "1.00" }), JSON.stringify({ rate: "1.00" }), JSON.stringify({ rate: "1.00" })];
+  const providerResponseHashes = providerResponses.map(sha256);
+  const record = {
+    schema: HCS_SCHEMA,
+    kind: "dispute" as const,
+    id: "dispute-duplicate-checker",
+    recordedAt: "2026-09-11T00:00:00.000Z",
+    payload: {
+      disputeId: "dispute-duplicate-checker",
+      ruleId: "fx-rate-v1" as const,
+      verdict: "accept" as const,
+      evaluationInput: { sha256: inputHash },
+      buyerResponse: { sha256: buyerResponseHash },
+      providerResponses: providerResponseHashes.map((sha256) => ({ sha256 })),
+      crossCheckerVerdicts: [
+        { checkerId: "checker-a", verdict: "accept" as const },
+        { checkerId: "checker-a", verdict: "accept" as const },
+        { checkerId: "checker-c", verdict: "accept" as const }
+      ]
+    }
+  };
+  const encoded = Buffer.from(encodeHcsRecord(record)).toString("base64");
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url === "https://mirror.invalid/api/v1/topics/0.0.7/messages") {
+      return new Response(JSON.stringify({ messages: [{ consensus_timestamp: "1", sequence_number: 1, message: encoded }], links: { next: null } }), { status: 200 });
+    }
+    throw new Error(`unexpected URL ${url}`);
+  };
+
+  await assert.rejects(
+    replayDispute("dispute-duplicate-checker", { mirrorNodeBaseUrl: "https://mirror.invalid", disputeTopicId: "0.0.7", contentStoreBaseUrl: "https://content.invalid" }, { fetchImpl }),
+    /VERITY_REPLAY_SCHEMA: dispute dispute-duplicate-checker did not contain the replay inputs/
+  );
+});

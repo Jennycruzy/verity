@@ -123,6 +123,7 @@ function parseDisputeRecord(value: Record<string, unknown>, disputeId: string): 
     || !candidate.providerResponses.every(isHashReference)
     || !Array.isArray(candidate.crossCheckerVerdicts)
     || !candidate.crossCheckerVerdicts.every(isCheckerReceipt)
+    || new Set(candidate.crossCheckerVerdicts.map((vote) => vote.checkerId)).size !== candidate.crossCheckerVerdicts.length
     || candidate.providerResponses.length !== candidate.crossCheckerVerdicts.length) {
     throw new Error(`VERITY_REPLAY_SCHEMA: dispute ${disputeId} did not contain the replay inputs`);
   }
