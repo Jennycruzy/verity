@@ -73,9 +73,9 @@ export function readRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
   return {
     facilitatorUrl: required(env, "BLOCKY402_URL"),
     network: required(env, "HEDERA_NETWORK"),
-    assetId: required(env, "HEDERA_ASSET_ID"),
-    payToAccountId: required(env, "HEDERA_PAY_TO_ACCOUNT_ID"),
-    clientAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
+    assetId: requiredHederaId(env, "HEDERA_ASSET_ID"),
+    payToAccountId: requiredHederaId(env, "HEDERA_PAY_TO_ACCOUNT_ID"),
+    clientAccountId: requiredHederaId(env, "HEDERA_CLIENT_ACCOUNT_ID"),
     clientPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
     mirrorNodeBaseUrl: required(env, "MIRROR_NODE_BASE_URL"),
     settlementTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
@@ -97,25 +97,27 @@ export function readProviderConfig(env: NodeJS.ProcessEnv = process.env): Provid
   return {
     facilitatorUrl: required(env, "BLOCKY402_URL"),
     network: required(env, "HEDERA_NETWORK"),
-    assetId: required(env, "HEDERA_ASSET_ID"),
-    payToAccountId: required(env, "HEDERA_PAY_TO_ACCOUNT_ID"),
+    assetId: requiredHederaId(env, "HEDERA_ASSET_ID"),
+    payToAccountId: requiredHederaId(env, "HEDERA_PAY_TO_ACCOUNT_ID"),
     requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
   };
 }
 
 export function readBuyerConfig(env: NodeJS.ProcessEnv = process.env): BuyerConfig {
+  const bondAssetId = env.VERITY_BOND_ASSET_ID?.trim() || "0.0.0";
+  assertHederaId(bondAssetId, "VERITY_BOND_ASSET_ID");
   return {
     facilitatorUrl: required(env, "BLOCKY402_URL"),
     network: required(env, "HEDERA_NETWORK"),
-    clientAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
+    clientAccountId: requiredHederaId(env, "HEDERA_CLIENT_ACCOUNT_ID"),
     clientPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
-    bondAssetId: env.VERITY_BOND_ASSET_ID?.trim() || "0.0.0",
+    bondAssetId,
     requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
   };
 }
 
 export function readSettlementConfig(env: NodeJS.ProcessEnv = process.env): SettlementConfig {
-  const escrowContractId = env.VERITY_ESCROW_CONTRACT_ID?.trim();
+  const escrowContractId = optionalHederaId(env, "VERITY_ESCROW_CONTRACT_ID");
   const escrowGas = optionalPositiveInteger(env, "VERITY_ESCROW_GAS");
   if (Boolean(escrowContractId) !== (escrowGas !== undefined)) {
     throw new Error("VERITY_CONFIG_INVALID: VERITY_ESCROW_CONTRACT_ID and VERITY_ESCROW_GAS must be set together");
@@ -123,12 +125,29 @@ export function readSettlementConfig(env: NodeJS.ProcessEnv = process.env): Sett
   return {
     facilitatorUrl: required(env, "BLOCKY402_URL"),
     network: required(env, "HEDERA_NETWORK"),
-    assetId: required(env, "HEDERA_ASSET_ID"),
-    operatorAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
+    assetId: requiredHederaId(env, "HEDERA_ASSET_ID"),
+    operatorAccountId: requiredHederaId(env, "HEDERA_CLIENT_ACCOUNT_ID"),
     operatorPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
     settlementTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
     disputeTopicId: required(env, "HCS_DISPUTE_TOPIC_ID"),
     requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000),
     ...(escrowContractId && escrowGas !== undefined ? { escrowContractId, escrowGas } : {})
   };
+}
+
+function requiredHederaId(env: NodeJS.ProcessEnv, name: string): string {
+  const value = required(env, name);
+  assertHederaId(value, name);
+  return value;
+}
+
+function optionalHederaId(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const value = env[name]?.trim();
+  if (!value) return undefined;
+  assertHederaId(value, name);
+  return value;
+}
+
+function assertHederaId(value: string, name: string): void {
+  if (!/^0\.0\.\d+$/.test(value)) throw new Error(`VERITY_CONFIG_INVALID: ${name} must use Hedera 0.0.N format`);
 }
