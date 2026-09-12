@@ -20,7 +20,7 @@ if (referenceProviderUrls.length !== checkerIds.length) {
 const disputeUrl = required("VERITY_DISPUTE_URL");
 const disputeHealthUrl = process.env.VERITY_DISPUTE_HEALTH_URL?.trim() || deriveHealthUrl(disputeUrl);
 const contentStore = new HttpContentStore(required("CONTENT_STORE_BASE_URL"));
-const providerId = requiredAny(["VERITY_DEMO_PROVIDER_ID", "VERITY_PROVIDER_ID"]);
+const providerId = requiredAny(["VERITY_DEMO_BAD_PROVIDER_ID", "VERITY_DEMO_PROVIDER_ID", "VERITY_PROVIDER_ID"]);
 const buyerId = required("VERITY_DEMO_BUYER_ROOT");
 const providerRoot = requiredAny(["VERITY_DEMO_PROVIDER_ROOT", "VERITY_PROVIDER_ROOT"]);
 const bond = required("VERITY_DEMO_BOND");
