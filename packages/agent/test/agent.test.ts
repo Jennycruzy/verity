@@ -19,6 +19,27 @@ test("majority adjudication is deterministic and rule-bound", async () => {
   assert.equal(result.verdict, "reject");
 });
 
+test("rejects duplicate checker identities before running them", async () => {
+  let calls = 0;
+  const checker = { id: "duplicate", check: async () => { calls += 1; return { verdict: "accept" as const, ruleId: "fx-rate-v1" as const, reasonCode: "ok", evidence: {} }; } };
+  await assert.rejects(adjudicate({ ruleId: "fx-rate-v1", value: {} }, [checker, checker, { ...checker, id: "third" }]), /VERITY_CHECKER_IDS/);
+  assert.equal(calls, 0);
+});
+
+test("rejects malformed checker output before calculating a majority", async () => {
+  await assert.rejects(
+    adjudicate(
+      { ruleId: "fx-rate-v1", value: {} },
+      [
+        { id: "a", check: async () => ({ verdict: "accept", ruleId: "fx-rate-v1", reasonCode: "ok", evidence: {} }) },
+        { id: "b", check: async () => ({ verdict: "unknown" }) as never },
+        { id: "c", check: async () => ({ verdict: "accept", ruleId: "fx-rate-v1", reasonCode: "ok", evidence: {} }) }
+      ]
+    ),
+    /VERITY_CHECKER_SCHEMA: b returned an invalid verdict/
+  );
+});
+
 test("disputes require both a verified root and a bond", () => {
   assert.throws(() => requireDisputeEligibility(undefined, "1"), /VERITY_IDENTITY_REQUIRED/);
   assert.throws(() => requireDisputeEligibility({ root: "root", action: "action", verifiedAt: "now", provider: "world-id" }, undefined), /VERITY_NO_BOND/);
