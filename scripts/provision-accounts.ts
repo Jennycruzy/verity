@@ -18,6 +18,12 @@ const network = required("HEDERA_NETWORK");
 const payerAccountId = required("HEDERA_CLIENT_ACCOUNT_ID");
 const payerPrivateKey = required("HEDERA_CLIENT_PRIVATE_KEY");
 const initialBalance = required("HEDERA_ACCOUNT_INITIAL_BALANCE_HBAR");
+const envText = await readFile(envPath, "utf8");
+for (const name of targetFields) {
+  if (!new RegExp(`^${name}=`, "m").test(envText)) {
+    throw new Error(`VERITY_ENV_FIELD_MISSING: ${name} is missing from .env`);
+  }
+}
 const client = createHederaClient(network, payerAccountId, payerPrivateKey);
 let provider: Awaited<ReturnType<typeof createEcdsaAccount>> | undefined;
 let treasury: Awaited<ReturnType<typeof createEcdsaAccount>> | undefined;
@@ -25,12 +31,11 @@ let treasury: Awaited<ReturnType<typeof createEcdsaAccount>> | undefined;
 try {
   provider = await createEcdsaAccount(client, initialBalance, "verity/provider/stake");
   treasury = await createEcdsaAccount(client, initialBalance, "verity/provider/treasury");
-  let envText = await readFile(envPath, "utf8");
-  envText = replaceEnvValue(envText, "HEDERA_PROVIDER_ACCOUNT_ID", provider.accountId);
-  envText = replaceEnvValue(envText, "HEDERA_PROVIDER_PRIVATE_KEY", provider.privateKey);
-  envText = replaceEnvValue(envText, "HEDERA_PROVIDER_EVM_ADDRESS", provider.evmAddress);
-  envText = replaceEnvValue(envText, "HEDERA_PAY_TO_ACCOUNT_ID", treasury.accountId);
-  await writeFile(envPath, envText, "utf8");
+  let updatedEnvText = replaceEnvValue(envText, "HEDERA_PROVIDER_ACCOUNT_ID", provider.accountId);
+  updatedEnvText = replaceEnvValue(updatedEnvText, "HEDERA_PROVIDER_PRIVATE_KEY", provider.privateKey);
+  updatedEnvText = replaceEnvValue(updatedEnvText, "HEDERA_PROVIDER_EVM_ADDRESS", provider.evmAddress);
+  updatedEnvText = replaceEnvValue(updatedEnvText, "HEDERA_PAY_TO_ACCOUNT_ID", treasury.accountId);
+  await writeFile(envPath, updatedEnvText, "utf8");
   console.log(JSON.stringify({
     network,
     provider: { accountId: provider.accountId, evmAddress: provider.evmAddress, transactionId: provider.transactionId },
