@@ -37,7 +37,7 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
       method: request.method ?? "GET",
       url: request.url ?? "/",
       headers: request.headers,
-      raw: request
+      ...(request.raw ? { raw: request.raw } : {})
     };
     const capability = await capabilityPromise;
     const amount = await resolvePrice(options.price, protectedRequest);

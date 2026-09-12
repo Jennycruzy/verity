@@ -1,0 +1,42 @@
+{
+  "name": "@jennycruzy/verity",
+  "version": "0.1.0",
+  "description": "Pay-per-correct-answer settlement and replay for x402 services on Hedera",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "files": [
+    "dist",
+    "types",
+    "README.md"
+  ],
+  "bin": {
+    "verity": "dist/verity.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-public.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@hiero-ledger/sdk": "2.85.0",
+    "@x402/core": "2.25.0",
+    "@x402/hedera": "2.25.0",
+    "dotenv": "^16.4.7",
+    "ethers": "6.16.0"
+  },
+  "devDependencies": {
+    "@verity/replay": "0.1.0",
+    "@verity/sdk": "0.1.0",
+    "esbuild": "0.28.2"
+  }
+}

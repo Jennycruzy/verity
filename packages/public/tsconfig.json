@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext"
+  },
+  "references": [
+    { "path": "../sdk" },
+    { "path": "../replay" }
+  ],
+  "include": ["src/**/*.ts"]
+}
