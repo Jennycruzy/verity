@@ -20,3 +20,9 @@ test("rejects oversized HCS records before network submission", () => {
     /maximum is 1024 bytes/
   );
 });
+
+test("rejects oversized or incomplete records received from Mirror Node", () => {
+  const oversized = JSON.stringify({ schema: HCS_SCHEMA, kind: "settlement", id: "request-1", recordedAt: "now", payload: { data: "x".repeat(1100) } });
+  assert.throws(() => decodeHcsRecord(oversized), /VERITY_HCS_RECORD_TOO_LARGE/);
+  assert.throws(() => decodeHcsRecord(JSON.stringify({ schema: HCS_SCHEMA, kind: "settlement", id: " ", recordedAt: "now", payload: {} })), /VERITY_HCS_RECORD_INVALID/);
+});

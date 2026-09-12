@@ -17,7 +17,7 @@ export function encodeHcsRecord<TPayload extends Record<string, unknown>>(record
   if (record.schema !== HCS_SCHEMA) {
     throw new Error(`VERITY_HCS_SCHEMA: expected ${HCS_SCHEMA}`);
   }
-  if (!record.id || !record.recordedAt) {
+  if (typeof record.id !== "string" || !record.id.trim() || typeof record.recordedAt !== "string" || !record.recordedAt.trim()) {
     throw new Error("VERITY_HCS_RECORD_INVALID: id and recordedAt are required");
   }
   const serialized = stableJson(record);
@@ -27,6 +27,10 @@ export function encodeHcsRecord<TPayload extends Record<string, unknown>>(record
 
 export function decodeHcsRecord(value: Uint8Array | string): HcsRecord {
   const serialized = typeof value === "string" ? value : new TextDecoder().decode(value);
+  const byteLength = Buffer.byteLength(serialized, "utf8");
+  if (byteLength > HCS_MESSAGE_MAX_BYTES) {
+    throw new Error(`VERITY_HCS_RECORD_TOO_LARGE: message is ${byteLength} bytes; maximum is ${HCS_MESSAGE_MAX_BYTES}`);
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(serialized);
@@ -45,7 +49,9 @@ function isHcsRecord(value: unknown): value is HcsRecord {
   return candidate.schema === HCS_SCHEMA
     && (candidate.kind === "settlement" || candidate.kind === "dispute" || candidate.kind === "verdict" || candidate.kind === "bond" || candidate.kind === "provider")
     && typeof candidate.id === "string"
+    && candidate.id.trim().length > 0
     && typeof candidate.recordedAt === "string"
+    && candidate.recordedAt.trim().length > 0
     && typeof candidate.payload === "object"
     && candidate.payload !== null
     && !Array.isArray(candidate.payload);
