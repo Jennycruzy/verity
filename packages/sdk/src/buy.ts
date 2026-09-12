@@ -113,9 +113,10 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   if (!identityProof) throw new Error("VERITY_IDENTITY_PROOF_MISSING: provide a verified World ID proof before rejecting a response");
   const identitySignal = requiredOption(options.identitySignal, "VERITY_IDENTITY_SIGNAL_MISSING: provide the signal bound to the dispute");
   const providerResponses = options.providerResponses;
-  if (!providerResponses || providerResponses.length < 3 || providerResponses.length % 2 === 0) {
+  if (!Array.isArray(providerResponses) || providerResponses.length < 3 || providerResponses.length % 2 === 0) {
     throw new Error("VERITY_PROVIDER_RESPONSES_MISSING: provide an odd number of at least three independent provider response references");
   }
+  providerResponses.forEach((reference, index) => assertContentReference(reference, `providerResponses[${index}]`));
 
   const contentStore = options.contentStore ?? new HttpContentStore(requiredEnvironment("CONTENT_STORE_BASE_URL"));
   const replayValue = options.evaluationInput === undefined
@@ -125,6 +126,8 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
       : options.evaluationInput;
   const evaluationInput = await contentStore.putJson(replayValue);
   const buyerResponse = await contentStore.putJson(data);
+  assertContentReference(evaluationInput, "evaluationInput");
+  assertContentReference(buyerResponse, "buyerResponse");
   const disputeId = options.disputeId ?? randomUUID();
   const requestId = options.requestId ?? randomUUID();
   const bond = options.postBond ?? createBondPoster(config, buyerAddress);
@@ -186,6 +189,19 @@ function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`VERITY_CONFIG_MISSING: ${name} is required; set it in .env`);
   return value;
+}
+
+function assertContentReference(value: unknown, name: string): asserts value is ContentReference {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`VERITY_CONTENT_REFERENCE_INVALID: ${name} must be an object`);
+  }
+  const candidate = value as Partial<ContentReference>;
+  if (typeof candidate.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(candidate.sha256)
+    || typeof candidate.mediaType !== "string" || !candidate.mediaType.trim()
+    || typeof candidate.byteLength !== "number" || !Number.isSafeInteger(candidate.byteLength) || candidate.byteLength < 0
+    || (candidate.uri !== undefined && (typeof candidate.uri !== "string" || !candidate.uri.trim()))) {
+    throw new Error(`VERITY_CONTENT_REFERENCE_INVALID: ${name} is not a valid content reference`);
+  }
 }
 
 function createBondPoster(config: ReturnType<typeof readBuyerConfig>, buyerAddress: string) {

@@ -153,6 +153,51 @@ test("rejects a malformed evaluator result before settlement", async () => {
   );
 });
 
+test("rejects malformed provider content before posting a bond", async () => {
+  process.env.BLOCKY402_URL = "https://facilitator.invalid";
+  process.env.HEDERA_NETWORK = "hedera:testnet";
+  process.env.HEDERA_CLIENT_ACCOUNT_ID = "0.0.2";
+  process.env.HEDERA_CLIENT_PRIVATE_KEY = PrivateKey.generateECDSA().toStringRaw();
+  const fetchImpl: typeof fetch = async (input, init) => {
+    if (!init?.headers) {
+      return new Response(JSON.stringify({
+        x402Version: 2,
+        resource: { url: String(input), description: "test", mimeType: "application/json" },
+        accepts: [{ scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: { feePayer: "0.0.999" } }]
+      }), { status: 402 });
+    }
+    return new Response(JSON.stringify({ expectedRate: "1.00", rate: "1.10", toleranceBps: 0 }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  let bondPosted = false;
+
+  await assert.rejects(
+    buy("https://provider.invalid/fx", {
+      evaluate: "fx-rate-v1",
+      bond: "10",
+      disputeUrl: "https://dispute.invalid/disputes",
+      providerId: "provider-1",
+      buyerId: "buyer-1",
+      buyerAddress: `0x${"03".repeat(20)}`,
+      providerRoot: "provider-root",
+      identityProof: { proof: "opaque" },
+      identitySignal: "request-1",
+      providerResponses: [
+        { sha256: "invalid", mediaType: "application/json", byteLength: 2 },
+        reference("checker-b"),
+        reference("checker-c")
+      ],
+      postBond: async () => {
+        bondPosted = true;
+        return { transactionId: "0.0.9@1.000000000" };
+      },
+      facilitator: new DiscoveryOnlyFacilitator("https://facilitator.invalid"),
+      fetchImpl
+    }),
+    /VERITY_CONTENT_REFERENCE_INVALID: providerResponses\[0\]/
+  );
+  assert.equal(bondPosted, false);
+});
+
 function reference(seed: string): ContentReference {
   return { sha256: sha256(seed), mediaType: "application/json", byteLength: 2, uri: `https://content.invalid/${seed}` };
 }
