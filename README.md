@@ -140,6 +140,8 @@ The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker end
 
 The quorum can include the separate Go implementation in `services/checker-go`, which does not import the Node provider or Verity rule package. Configure `CHECKER_PORT`, `CHECKER_ID`, and `CHECKER_MAX_BODY_BYTES`, then run `npm run checker:go`. Its `/check` endpoint uses exact rational arithmetic for `fx-rate-v1` and returns the same published verdict schema.
 
+The public compose deployment keeps the degradable `bad-fx` process out of adjudication. It runs a second honest FX process plus the separate Go checker, so the three votes are produced by two independently started Node processes and a different implementation. The Go service must receive `CHECKER_ID=fx-independent-go` in deployment configuration.
+
 When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC8004_AGENT_ID` are set, the provider also serves `GET /.well-known/agent-registration.json` with its x402 resource, checker, and registry references.
 
 The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live Graph endpoint and query files configured, `npm run graph:mcp` exposes provider reliability and buyer honesty as MCP tools. The Graph transport requires an x402 challenge and settles the query before returning data.

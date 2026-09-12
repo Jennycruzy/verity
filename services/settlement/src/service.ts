@@ -136,20 +136,22 @@ export class SettlementCoordinator {
       reputationTransactionId = escrowResult.reputationTransactionId;
       state = transition(state, "adjudication_upheld");
     } else {
+      let escrowResult: Awaited<ReturnType<typeof resolveEscrow>>;
+      try {
+        escrowResult = await resolveEscrow(this.escrow, request, false);
+      } catch (error) {
+        throw new Error("VERITY_ESCROW_RESOLUTION_FAILED: correct-provider resolution did not complete; payment was not settled", { cause: error });
+      }
+      stakeLockTransactionId = escrowResult.stakeLockTransactionId;
+      bondResolutionTransactionId = escrowResult.bondResolutionTransactionId;
+      reputationTransactionId = escrowResult.reputationTransactionId;
+
       const result = await this.facilitator.settle(request.paymentPayload, request.paymentRequirements);
       if (!result.success || !result.transaction) {
         transition(state, "settlement_failed");
         throw new Error(`VERITY_SETTLEMENT_FAILED: ${result.errorReason ?? "unknown"} ${result.errorMessage ?? ""}`.trim());
       }
       transactionId = result.transaction;
-      try {
-        const escrowResult = await resolveEscrow(this.escrow, request, false);
-        stakeLockTransactionId = escrowResult.stakeLockTransactionId;
-        bondResolutionTransactionId = escrowResult.bondResolutionTransactionId;
-        reputationTransactionId = escrowResult.reputationTransactionId;
-      } catch (error) {
-        throw new Error(`VERITY_ESCROW_RESOLUTION_FAILED: payment ${transactionId} succeeded but bond resolution did not complete`, { cause: error });
-      }
       state = transition(state, "adjudication_overturned");
     }
     if (state !== "void" && state !== "settled") {

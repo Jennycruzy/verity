@@ -158,22 +158,43 @@ test("records a complete upheld dispute without settling the held payment", asyn
 
 test("settles and records an overturned dispute", async () => {
   const published: unknown[] = [];
+  const calls: string[] = [];
+  const facilitator = new FacilitatorForTest("https://facilitator.invalid");
   const coordinator = new SettlementCoordinator(
-    new FacilitatorForTest("https://facilitator.invalid"),
+    facilitator,
     { publish: async (_topic, record) => { encodeHcsRecord(record); published.push(record); return "0.0.8@4.000000000"; } },
     { settlement: "0.0.7", dispute: "0.0.8" },
-    escrowForTest()
+    escrowForTest(calls)
   );
   const result = await coordinator.recordAdjudication(disputeRequest("accept"));
   assert.equal(result.state, "settled");
   assert.equal(result.transactionId, "0.0.99@1.000000000");
   assert.equal((published[2] as { payload: { resolutionTransactionId: string } }).payload.resolutionTransactionId, "0.0.99@1.000000000");
+  assert.deepEqual(calls, ["lock", "resolve", "reputation"]);
+  assert.equal(facilitator.settleCalls, 1);
 });
 
-function escrowForTest() {
+test("does not settle an overturned dispute when escrow resolution fails", async () => {
+  const facilitator = new FacilitatorForTest("https://facilitator.invalid");
+  const coordinator = new SettlementCoordinator(
+    facilitator,
+    { publish: async () => "0.0.8@5.000000000" },
+    { settlement: "0.0.7", dispute: "0.0.8" },
+    {
+      async lockStake() { return { transactionId: "0.0.10@1.000000000" }; },
+      async resolveBond() { throw new Error("escrow unavailable"); },
+      async anchorReputation() { return { transactionId: "0.0.10@3.000000000" }; }
+    }
+  );
+
+  await assert.rejects(coordinator.recordAdjudication(disputeRequest("accept")), /VERITY_ESCROW_RESOLUTION_FAILED: correct-provider resolution did not complete/);
+  assert.equal(facilitator.settleCalls, 0);
+});
+
+function escrowForTest(calls: string[] = []) {
   return {
-    async lockStake() { return { transactionId: "0.0.10@1.000000000" }; },
-    async resolveBond() { return { transactionId: "0.0.10@2.000000000" }; },
-    async anchorReputation() { return { transactionId: "0.0.10@3.000000000" }; }
+    async lockStake() { calls.push("lock"); return { transactionId: "0.0.10@1.000000000" }; },
+    async resolveBond() { calls.push("resolve"); return { transactionId: "0.0.10@2.000000000" }; },
+    async anchorReputation() { calls.push("reputation"); return { transactionId: "0.0.10@3.000000000" }; }
   };
 }

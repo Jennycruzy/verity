@@ -28,7 +28,7 @@
     "provision:graph-signers": "node --import tsx scripts/provision-graph-signers.ts",
     "register:agent": "tsx scripts/register-agent.ts",
     "publish:agent0-feedback": "tsx scripts/publish-agent0-feedback.ts",
-    "graph:prepare": "tsx scripts/prepare-graph.ts",
+    "graph:prepare": "npm run build && tsx scripts/prepare-graph.ts",
     "graph:build": "npm run graph:prepare && npm --prefix graph/subgraph run build",
     "graph:deploy": "npm run graph:build && tsx scripts/deploy-graph.ts",
     "graph:gateway": "npm --workspace @verity/graph-gateway start",

@@ -10,6 +10,7 @@ Use any Linux VPS with Docker Engine and the Compose plugin. Point these hostnam
 content.<domain>
 disputes.<domain>
 fx.<domain>
+fx-secondary.<domain>
 bad-fx.<domain>
 checker.<domain>
 explorer.<domain>
@@ -73,7 +74,7 @@ docker compose ps
 Check every public service before running a paid request:
 
 ```sh
-for host in content disputes fx bad-fx checker explorer reputation identity; do
+for host in content disputes fx fx-secondary bad-fx checker explorer reputation identity; do
   curl --fail --silent --show-error "https://${host}.<domain>/health"
   echo
 done

@@ -14,6 +14,10 @@ bad-fx.{$VERITY_DOMAIN} {
   reverse_proxy bad-fx:8080
 }
 
+fx-secondary.{$VERITY_DOMAIN} {
+  reverse_proxy fx-secondary:8080
+}
+
 checker.{$VERITY_DOMAIN} {
   reverse_proxy checker:3201
 }

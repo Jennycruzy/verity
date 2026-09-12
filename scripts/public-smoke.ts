@@ -11,6 +11,7 @@ const checks = [
   ["disputes", "disputes", "/health"],
   ["fx-health", "fx", "/health"],
   ["bad-fx", "bad-fx", "/health"],
+  ["fx-secondary", "fx-secondary", "/health"],
   ["checker", "checker", "/health"],
   ["explorer", "explorer", "/health"],
   ["reputation", "reputation", "/health"],

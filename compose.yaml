@@ -48,6 +48,15 @@ services:
       DEGRADE_MODE: "true"
       VERITY_PROVIDER_PUBLIC_URL: https://bad-fx.${VERITY_DOMAIN}
 
+  fx-secondary:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/providers", "start"]
+    environment:
+      PORT: "8080"
+      PROVIDER_KIND: fx
+      DEGRADE_MODE: "false"
+      VERITY_PROVIDER_PUBLIC_URL: https://fx-secondary.${VERITY_DOMAIN}
+
   checker:
     build:
       context: services/checker-go
@@ -55,6 +64,7 @@ services:
     restart: unless-stopped
     environment:
       CHECKER_PORT: "3201"
+      CHECKER_ID: fx-independent-go
 
   disputes:
     <<: *node
@@ -62,12 +72,13 @@ services:
     depends_on:
       - content
       - fx
+      - fx-secondary
       - checker
     environment:
       DISPUTE_PORT: "8091"
       DISPUTE_STORE_DIR: /data/disputes
       CONTENT_STORE_BASE_URL: http://content:8090
-      DISPUTE_CHECKERS_JSON: '[{"id":"fx-node","url":"http://fx:8080/check"},{"id":"fx-bad-node","url":"http://bad-fx:8080/check"},{"id":"fx-independent-go","url":"http://checker:3201/check"}]'
+      DISPUTE_CHECKERS_JSON: '[{"id":"fx-node-a","url":"http://fx:8080/check"},{"id":"fx-node-b","url":"http://fx-secondary:8080/check"},{"id":"fx-independent-go","url":"http://checker:3201/check"}]'
     volumes:
       - dispute_data:/data/disputes
 
