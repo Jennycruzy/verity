@@ -28,6 +28,7 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
   const config = readProviderConfig();
   const facilitator = options.facilitator ?? new Blocky402Client(config.facilitatorUrl, { requestTimeoutMs: config.requestTimeoutMs });
   const capabilityPromise = discoverHederaCapability(facilitator, config.network);
+  const stake = resolveStake(options.stake);
 
   return async (request, response) => {
     const protectedRequest: ProtectedRequest = {
@@ -42,7 +43,7 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
       network: capability.network as Network,
       amount,
       payTo: config.payToAccountId,
-      maxTimeoutSeconds: options.maxTimeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS,
+      maxTimeoutSeconds: resolveTimeout(options.maxTimeoutSeconds),
       asset: config.assetId,
       extra: { feePayer: capability.feePayer }
     };
@@ -75,17 +76,33 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
     }
 
     response.setHeader("verity-payment-verifier", options.verifier);
-    if (options.stake) response.setHeader("verity-provider-stake", options.stake);
+    if (stake) response.setHeader("verity-provider-stake", stake);
     await application(protectedRequest, response);
   };
 }
 
 async function resolvePrice(price: PriceResolver, request: ProtectedRequest): Promise<string> {
   const value = typeof price === "function" ? await price(request) : price;
-  if (!/^\d+$/.test(value) || BigInt(value) <= 0n) {
+  if (typeof value !== "string" || !/^\d+$/.test(value.trim()) || BigInt(value.trim()) <= 0n) {
     throw new Error("VERITY_PRICE_INVALID: price must be a positive integer in the configured asset's smallest unit");
   }
-  return value;
+  return value.trim();
+}
+
+function resolveTimeout(value: number | undefined): number {
+  const normalized = value ?? DEFAULT_TIMEOUT_SECONDS;
+  if (!Number.isSafeInteger(normalized) || normalized <= 0) {
+    throw new Error("VERITY_TIMEOUT_INVALID: maxTimeoutSeconds must be a positive integer");
+  }
+  return normalized;
+}
+
+function resolveStake(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value.trim()) || BigInt(value.trim()) <= 0n) {
+    throw new Error("VERITY_STAKE_INVALID: stake must be a positive integer in the configured asset's smallest unit");
+  }
+  return value.trim();
 }
 
 function sendPaymentRequired(

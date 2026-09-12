@@ -305,6 +305,9 @@ function assertPaymentCapability(requirements: PaymentRequirements, feePayer: st
 
 async function evaluateValue(evaluator: Evaluator, value: unknown, response: Response, requirements: PaymentRequirements): Promise<DeterministicVerdict> {
   const verdict = typeof evaluator === "function" ? await evaluator(value, response, requirements) : evaluateByRule(evaluator, value);
+  if (!isDeterministicVerdict(verdict)) {
+    throw new Error("VERITY_EVALUATOR_SCHEMA: evaluate must return a deterministic verdict with verdict, ruleId, reasonCode, and evidence");
+  }
   if (verdict.ruleId !== (typeof evaluator === "function" ? verdict.ruleId : evaluator)) {
     throw new Error(`VERITY_RULE_MISMATCH: evaluator returned ${verdict.ruleId}`);
   }
@@ -346,4 +349,14 @@ function isPaymentRequired(value: unknown): value is PaymentRequired {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<PaymentRequired>;
   return candidate.x402Version === 2 && typeof candidate.resource === "object" && Array.isArray(candidate.accepts);
+}
+
+function isDeterministicVerdict(value: unknown): value is DeterministicVerdict {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Partial<DeterministicVerdict>;
+  return (candidate.verdict === "accept" || candidate.verdict === "reject")
+    && (candidate.ruleId === RULE_IDS.fxRate || candidate.ruleId === RULE_IDS.entityCanonical)
+    && typeof candidate.reasonCode === "string"
+    && candidate.reasonCode.trim().length > 0
+    && Boolean(candidate.evidence && typeof candidate.evidence === "object" && !Array.isArray(candidate.evidence));
 }

@@ -46,3 +46,25 @@ test("protect returns a v2 payment challenge before invoking the application", a
   assert.ok(headers.get("payment-required"));
   assert.match(body, /"x402Version":2/);
 });
+
+test("protect rejects invalid timeout and stake metadata", async () => {
+  process.env.BLOCKY402_URL = "https://facilitator.invalid";
+  process.env.HEDERA_NETWORK = "hedera:testnet";
+  process.env.HEDERA_ASSET_ID = "0.0.0";
+  process.env.HEDERA_PAY_TO_ACCOUNT_ID = "0.0.1";
+  const response = { setHeader() {}, end() {} } as never;
+  const timeoutHandler = protect(async () => {}, {
+    price: "1",
+    verifier: "fx-rate-v1",
+    maxTimeoutSeconds: 0,
+    facilitator: new DiscoveryOnlyFacilitator("https://facilitator.invalid")
+  });
+  await assert.rejects(timeoutHandler({ method: "GET", url: "/fx", headers: {} }, response), /VERITY_TIMEOUT_INVALID/);
+
+  assert.throws(() => protect(async () => {}, {
+    price: "1",
+    verifier: "fx-rate-v1",
+    stake: "0",
+    facilitator: new DiscoveryOnlyFacilitator("https://facilitator.invalid")
+  }), /VERITY_STAKE_INVALID/);
+});
