@@ -25,6 +25,7 @@ export interface DisputeResolutionRequest extends SettlementRequest {
   readonly verdict: DeterministicVerdict;
   readonly buyerBondAmount: string;
   readonly bondTransactionId?: string;
+  readonly bondScheduleId?: string;
   readonly providerStakeAmount: string;
   readonly buyerAddress: string;
   readonly providerAddress: string;
@@ -168,6 +169,7 @@ export class SettlementCoordinator {
         crossCheckerVerdicts: request.crossCheckerVerdicts.map((vote) => ({ checkerId: vote.checkerId, verdict: vote.verdict })),
         verdict: request.verdict.verdict,
         buyerBondAmount: request.buyerBondAmount,
+        ...(request.bondScheduleId ? { bondScheduleId: request.bondScheduleId } : {}),
         providerStakeAmount: request.providerStakeAmount,
         resolution: state
       }
@@ -193,6 +195,7 @@ export class SettlementCoordinator {
         disputeId: request.disputeId,
         resolution: state,
         ...(request.bondTransactionId ? { bondTransactionId: request.bondTransactionId } : {}),
+        ...(request.bondScheduleId ? { bondScheduleId: request.bondScheduleId } : {}),
         ...(stakeLockTransactionId ? { stakeLockTransactionId } : {}),
         ...(bondResolutionTransactionId ? { bondResolutionTransactionId } : {}),
         ...(reputationTransactionId ? { reputationTransactionId } : {}),

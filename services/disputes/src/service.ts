@@ -41,6 +41,7 @@ export interface DisputeSubmission {
   readonly buyerAddress: string;
   readonly buyerBondAmount: string;
   readonly bondTransactionId: string;
+  readonly bondScheduleId?: string;
   readonly evaluationInput: ContentReference;
   readonly buyerResponse: ContentReference;
   readonly providerResponses: readonly ContentReference[];
@@ -52,6 +53,7 @@ export interface DisputeResult {
   readonly buyerRoot: string;
   readonly providerRoot: string;
   readonly bondTransactionId: string;
+  readonly bondScheduleId?: string;
   readonly verdict: DeterministicVerdict;
   readonly votes: readonly CrossCheckerVerdict[];
   readonly state: Extract<SettlementOutcome["state"], "settled" | "void">;
@@ -168,6 +170,7 @@ export class DisputeProcessor {
       verdict,
       buyerBondAmount: eligibility.bondAmount,
       bondTransactionId: submission.bondTransactionId,
+      ...(submission.bondScheduleId ? { bondScheduleId: submission.bondScheduleId } : {}),
       providerStakeAmount: provider.providerStakeAmount,
       buyerAddress: submission.buyerAddress,
       providerAddress: provider.providerAddress,
@@ -183,6 +186,7 @@ export class DisputeProcessor {
       buyerRoot: eligibility.buyer.root,
       providerRoot: provider.providerRoot,
       bondTransactionId: submission.bondTransactionId,
+      ...(submission.bondScheduleId ? { bondScheduleId: submission.bondScheduleId } : {}),
       verdict,
       votes: adjudication.votes,
       state: outcome.state,
@@ -215,6 +219,9 @@ function validateSubmission(value: DisputeSubmission, checkerCount: number): voi
     throw new DisputeInputError("VERITY_NO_BOND: buyerBondAmount must be a positive integer");
   }
   if (!value.bondTransactionId.trim()) throw new DisputeInputError("VERITY_BOND_TRANSACTION_MISSING: provide the posted bond transaction ID");
+  if (value.bondScheduleId !== undefined && !value.bondScheduleId.trim()) {
+    throw new DisputeInputError("VERITY_BOND_SCHEDULE_INVALID: bondScheduleId cannot be empty");
+  }
   validateReference(value.evaluationInput, "evaluationInput");
   validateReference(value.buyerResponse, "buyerResponse");
   if (value.providerResponses.length !== checkerCount) {
@@ -287,6 +294,7 @@ export function isDisputeSubmission(value: unknown): value is DisputeSubmission 
     && typeof candidate.buyerAddress === "string"
     && typeof candidate.buyerBondAmount === "string"
     && typeof candidate.bondTransactionId === "string"
+    && (candidate.bondScheduleId === undefined || typeof candidate.bondScheduleId === "string")
     && isContentReference(candidate.evaluationInput)
     && isContentReference(candidate.buyerResponse)
     && Array.isArray(candidate.providerResponses)

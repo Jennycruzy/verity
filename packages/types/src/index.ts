@@ -76,6 +76,7 @@ export interface DisputeRecord {
   readonly verdict: Verdict;
   readonly buyerBondAmount: string;
   readonly bondTransactionId?: string;
+  readonly bondScheduleId?: string;
   readonly providerStakeAmount: string;
   readonly resolutionTransactionId?: string;
   readonly recordedAt: string;

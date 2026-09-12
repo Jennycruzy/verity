@@ -164,6 +164,8 @@ The script publishes a compact `provider` record to the settlement HCS topic con
 
 `register:agent` normalizes the ERC-8004 registry reference, anchors the provider's human root and public endpoint in the escrow contract's `AgentRegistered` event, and writes the Hedera transaction ID to `VERITY_PROVIDER_AGENT_REGISTRATION_TX`. The contract rejects a second registration for the same normalized agent reference.
 
+To protect a bonded rejection from a process crash after the bond is posted, set `VERITY_BOND_EXPIRY_SECONDS` to a positive duration. The buyer then calls `postBondWithExpiry` and creates a Hedera Scheduled Transaction for `releaseExpiredBond`; the returned schedule ID is carried through the dispute request and HCS receipts. Leave it blank for the ordinary dispute path. A scheduled release only returns an unresolved bond after its expiry, so it cannot override a completed adjudication.
+
 ## Paid request and replay
 
 Configure `VERITY_DEMO_PROVIDER_URL`, the matching rule and expected value, provider/buyer IDs, and the HCS topics. Then run:
@@ -209,13 +211,13 @@ The resource server delivers before settlement, so the payment hold must survive
 | Proof of Human root | `packages/agent/src/identity.ts:1` | Adapter implemented; World credentials/config required |
 | Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor implemented; public score indexing remains |
 | Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
-| Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88` and `packages/hcs/src/escrow.ts:42` | Expiring bonds and wait-for-expiry scheduling implemented; needs a live testnet run |
+| Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88`, `packages/hcs/src/escrow.ts:42`, and `packages/sdk/src/buy.ts:1` | Expiring bonds, wait-for-expiry scheduling, and SDK wiring implemented; needs a live testnet run |
 | HTS custom fee settlement asset | `packages/hcs/src/token.ts:1` and `scripts/provision-token.ts:1` | Optional provisioning, association assertions, metadata checks, and same-token fee implemented; needs a live testnet run |
 | ERC-8004/HCS-14 registry | `packages/indexer/src/erc8004.ts:1` | Standard identity primitives implemented; live Hedera registry is not available in the current target deployment |
 
 ## Limitations
 
-Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. The HTS token command is optional and requires associated accounts plus a live token transaction. External provider adoption, live contract IDs, HCS IDs, and real dispute IDs are intentionally absent until they are produced by testnet runs rather than documentation.
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption, live contract IDs, HCS IDs, and real dispute IDs are intentionally absent until they are produced by testnet runs rather than documentation.
 
 ## Adoption
 

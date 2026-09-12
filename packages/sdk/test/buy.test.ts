@@ -22,6 +22,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
   process.env.HEDERA_CLIENT_PRIVATE_KEY = PrivateKey.generateECDSA().toStringRaw();
   const calls: string[] = [];
   const references = [reference("checker-a"), reference("checker-b"), reference("checker-c"), reference("checker-d"), reference("checker-e")];
+  const bondExpiry = new Date(Date.now() + 120_000);
   const contentStore = {
     async putJson(value: unknown): Promise<ContentReference> {
       calls.push(`content:${JSON.stringify(value)}`);
@@ -48,6 +49,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     calls.push("dispute");
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     assert.equal(body.bondTransactionId, "0.0.9@1.000000000");
+    assert.equal(body.bondScheduleId, "0.0.10");
     assert.equal(body.providerRoot, undefined);
     assert.equal((body.providerResponses as unknown[]).length, 5);
     return new Response(JSON.stringify({ state: "void", hcsTransactionId: "0.0.8@2.000000000" }), { status: 201, headers: { "content-type": "application/json" } });
@@ -64,6 +66,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
       return { expectedRate: "1.00", actualRate: record.rate, toleranceBps: 0 };
     },
     bond: "10",
+    bondExpiry,
     disputeUrl: "https://dispute.invalid/disputes",
     providerId: "provider-1",
     buyerId: "buyer-1",
@@ -73,15 +76,17 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     identitySignal: "request-1",
     providerResponses: references,
     contentStore,
-    postBond: async (disputeId, providerRoot, amount) => {
+    postBond: async (disputeId, providerRoot, amount, expiresAt) => {
       calls.push(`bond:${disputeId}:${providerRoot}:${amount}`);
-      return { transactionId: "0.0.9@1.000000000" };
+      assert.equal(expiresAt?.getTime(), bondExpiry.getTime());
+      return { transactionId: "0.0.9@1.000000000", scheduleId: "0.0.10" };
     },
     facilitator: new DiscoveryOnlyFacilitator("https://facilitator.invalid"),
     fetchImpl
   });
   assert.equal(result.verdict.verdict, "reject");
   assert.equal(result.bondTransactionId, "0.0.9@1.000000000");
+  assert.equal(result.bondScheduleId, "0.0.10");
   assert.equal(result.disputeId !== undefined, true);
   assert.equal(calls[0], "delivery");
   assert.match(calls[1] ?? "", /^content:/);

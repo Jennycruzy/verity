@@ -9,9 +9,15 @@ import { evaluateEntity, evaluateFxRate, RULE_IDS, type ContentReference, type D
 export type Evaluator = RuleId | ((value: unknown, response: Response, requirements: PaymentRequirements) => DeterministicVerdict | Promise<DeterministicVerdict>);
 export type EvaluationInputResolver = (value: unknown, response: Response, requirements: PaymentRequirements) => unknown | Promise<unknown>;
 
+export interface BondPostResult {
+  readonly transactionId: string;
+  readonly scheduleId?: string;
+}
+
 export interface BuyOptions {
   readonly evaluate: Evaluator;
   readonly bond?: string;
+  readonly bondExpiry?: Date;
   readonly maxPrice?: string;
   readonly disputeUrl?: string;
   readonly requestId?: string;
@@ -25,7 +31,7 @@ export interface BuyOptions {
   readonly evaluationInput?: unknown | EvaluationInputResolver;
   readonly providerResponses?: readonly ContentReference[];
   readonly contentStore?: ContentStore;
-  readonly postBond?: (disputeId: string, providerRoot: string, amountTinybars: string) => Promise<{ transactionId: string }>;
+  readonly postBond?: (disputeId: string, providerRoot: string, amountTinybars: string, expiresAt?: Date) => Promise<BondPostResult>;
   readonly fetchImpl?: typeof fetch;
   readonly facilitator?: Blocky402Client;
   readonly settle?: (paymentPayload: PaymentPayload, requirements: PaymentRequirements) => Promise<SettleResponse>;
@@ -40,6 +46,7 @@ export interface BuyResult {
   readonly dispute?: unknown;
   readonly disputeId?: string;
   readonly bondTransactionId?: string;
+  readonly bondScheduleId?: string;
 }
 
 export async function buy(url: string, options: BuyOptions): Promise<BuyResult> {
@@ -101,6 +108,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   const buyerId = requiredOption(options.buyerId, "VERITY_BUYER_ID_MISSING: configure buyerId for a bonded rejection");
   const buyerAddress = requiredOption(options.buyerAddress ?? process.env.HEDERA_CLIENT_EVM_ADDRESS, "VERITY_BUYER_ADDRESS_MISSING: configure the buyer EVM address for escrow resolution");
   const providerRoot = requiredOption(options.providerRoot, "VERITY_PROVIDER_ROOT_MISSING: configure providerRoot before posting a bond");
+  const bondExpiry = resolveBondExpiry(options.bondExpiry);
   const identityProof = options.identityProof;
   if (!identityProof) throw new Error("VERITY_IDENTITY_PROOF_MISSING: provide a verified World ID proof before rejecting a response");
   const identitySignal = requiredOption(options.identitySignal, "VERITY_IDENTITY_SIGNAL_MISSING: provide the signal bound to the dispute");
@@ -119,11 +127,14 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   const buyerResponse = await contentStore.putJson(data);
   const disputeId = options.disputeId ?? randomUUID();
   const requestId = options.requestId ?? randomUUID();
-  const bond = options.postBond ?? createBondPoster(config);
-  let bondTransactionId: string;
+  const bond = options.postBond ?? createBondPoster(config, buyerAddress);
+  let bondResult: BondPostResult;
   try {
-    const bondResult = await bond(disputeId, providerRoot, options.bond);
-    bondTransactionId = bondResult.transactionId;
+    bondResult = await bond(disputeId, providerRoot, options.bond, bondExpiry);
+    if (!bondResult.transactionId.trim()) throw new Error("bond poster returned no transaction ID");
+    if (bondExpiry && !bondResult.scheduleId?.trim()) {
+      throw new Error("bond poster returned no schedule ID for the configured expiry");
+    }
   } catch (error) {
     throw new Error(`VERITY_BOND_POST_FAILED: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
@@ -143,7 +154,8 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
       identityProof,
       identitySignal,
       buyerBondAmount: options.bond,
-      bondTransactionId,
+      bondTransactionId: bondResult.transactionId,
+      ...(bondResult.scheduleId ? { bondScheduleId: bondResult.scheduleId } : {}),
       evaluationInput,
       buyerResponse,
       providerResponses
@@ -153,7 +165,16 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   if (!disputeResponse.ok) {
     throw new Error(`VERITY_DISPUTE_FAILED: ${disputeResponse.status} ${JSON.stringify(disputeBody)}`);
   }
-  return { data, verdict, paymentPayload, requirements, dispute: disputeBody, disputeId, bondTransactionId };
+  return {
+    data,
+    verdict,
+    paymentPayload,
+    requirements,
+    dispute: disputeBody,
+    disputeId,
+    bondTransactionId: bondResult.transactionId,
+    ...(bondResult.scheduleId ? { bondScheduleId: bondResult.scheduleId } : {})
+  };
 }
 
 function requiredOption(value: string | undefined, message: string): string {
@@ -167,21 +188,57 @@ function requiredEnvironment(name: string): string {
   return value;
 }
 
-function createBondPoster(config: ReturnType<typeof readBuyerConfig>) {
+function createBondPoster(config: ReturnType<typeof readBuyerConfig>, buyerAddress: string) {
   if (config.bondAssetId !== "0.0.0") {
     throw new Error("VERITY_ESCROW_ASSET_UNSUPPORTED: bond escrow currently accepts HBAR only; set VERITY_BOND_ASSET_ID=0.0.0");
   }
   const contractId = requiredEnvironment("VERITY_ESCROW_CONTRACT_ID");
   const gas = Number(requiredEnvironment("VERITY_ESCROW_GAS"));
   if (!Number.isSafeInteger(gas) || gas <= 0) throw new Error("VERITY_ESCROW_GAS_INVALID: use a positive integer gas limit");
-  return async (disputeId: string, providerRoot: string, amountTinybars: string) => {
+  return async (disputeId: string, providerRoot: string, amountTinybars: string, expiresAt?: Date): Promise<BondPostResult> => {
     const client = createHederaClient(config.network, config.clientAccountId, config.clientPrivateKey);
     try {
-      return await createVerityEscrowClient(client, contractId, gas).postBond(disputeId, providerRoot, amountTinybars);
+      const escrow = createVerityEscrowClient(client, contractId, gas);
+      const posted = expiresAt
+        ? await escrow.postBondWithExpiry(disputeId, providerRoot, amountTinybars, expiresAt)
+        : await escrow.postBond(disputeId, providerRoot, amountTinybars);
+      if (!expiresAt) return posted;
+      let scheduled;
+      try {
+        scheduled = await escrow.scheduleBondExpiry(disputeId, buyerAddress, expiresAt);
+      } catch (error) {
+        throw new Error(`bond transaction ${posted.transactionId} succeeded but expiry scheduling failed`, { cause: error });
+      }
+      return { transactionId: posted.transactionId, scheduleId: scheduled.scheduleId };
     } finally {
       client.close();
     }
   };
+}
+
+function resolveBondExpiry(explicit?: Date): Date | undefined {
+  if (explicit !== undefined) {
+    assertFutureDate(explicit);
+    return explicit;
+  }
+  const raw = process.env.VERITY_BOND_EXPIRY_SECONDS?.trim();
+  if (!raw) return undefined;
+  if (!/^\d+$/.test(raw) || BigInt(raw) <= 0n) {
+    throw new Error("VERITY_BOND_EXPIRY_INVALID: VERITY_BOND_EXPIRY_SECONDS must be a positive integer");
+  }
+  const seconds = Number(raw);
+  if (!Number.isSafeInteger(seconds) || seconds > Number.MAX_SAFE_INTEGER / 1000) {
+    throw new Error("VERITY_BOND_EXPIRY_INVALID: expiry duration is too large");
+  }
+  const expiry = new Date(Date.now() + seconds * 1000);
+  assertFutureDate(expiry);
+  return expiry;
+}
+
+function assertFutureDate(value: Date): void {
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime()) || value.getTime() <= Date.now()) {
+    throw new Error("VERITY_BOND_EXPIRY_INVALID: bond expiry must be a future date");
+  }
 }
 
 function replayInput(evaluator: Evaluator, value: unknown): unknown {
