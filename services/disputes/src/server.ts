@@ -1,4 +1,5 @@
-import "dotenv/config";
+import { config as loadDotenv } from "dotenv";
+import { fileURLToPath } from "node:url";
 import { HttpContentStore } from "@verity/content";
 import { FileRootStore, WorldIdVerifier } from "@verity/agent";
 import { createSettlementCoordinator } from "@verity/settlement";
@@ -9,6 +10,8 @@ import { readDisputeServiceConfig } from "./config.js";
 import { readProviderRegistryFromHcs } from "./registry.js";
 import { DisputeProcessor } from "./service.js";
 import { FileDisputeStore } from "./store.js";
+
+loadDotenv({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
 const config = readDisputeServiceConfig();
 const providers = await readProviderRegistryFromHcs(config.mirrorNodeBaseUrl, config.providerTopicId, { escrowContractId: config.escrowContractId });

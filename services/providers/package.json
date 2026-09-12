@@ -8,7 +8,8 @@
     "@verity/hedera": "0.1.0",
     "@verity/indexer": "0.1.0",
     "@verity/sdk": "0.1.0",
-    "@verity/types": "0.1.0"
+    "@verity/types": "0.1.0",
+    "dotenv": "^16.4.7"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

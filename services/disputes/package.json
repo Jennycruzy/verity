@@ -18,6 +18,7 @@
     "@verity/settlement": "0.1.0",
     "@verity/types": "0.1.0",
     "@x402/core": "2.25.0",
+    "dotenv": "^16.4.7",
     "ethers": "6.16.0"
   },
   "scripts": {

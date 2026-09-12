@@ -5,7 +5,8 @@
   "type": "module",
   "main": "dist/server.js",
   "dependencies": {
-    "@verity/indexer": "0.1.0"
+    "@verity/indexer": "0.1.0",
+    "dotenv": "^16.4.7"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
