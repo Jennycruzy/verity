@@ -22,6 +22,9 @@ interface ContractResult {
 }
 
 const POST_BOND_INTERFACE = new Interface(["function postBond(bytes32 disputeId, bytes32 providerRoot) payable"]);
+const POST_BOND_WITH_EXPIRY_INTERFACE = new Interface(["function postBondWithExpiry(bytes32 disputeId, bytes32 providerRoot, uint256 expiresAt) payable"]);
+const POST_BOND_SELECTOR = POST_BOND_INTERFACE.getFunction("postBond")?.selector;
+const POST_BOND_WITH_EXPIRY_SELECTOR = POST_BOND_WITH_EXPIRY_INTERFACE.getFunction("postBondWithExpiry")?.selector;
 
 export class MirrorBondVerifier implements BondVerifier {
   private readonly baseUrl: string;
@@ -54,15 +57,26 @@ export class MirrorBondVerifier implements BondVerifier {
     if (String(value.from).toLowerCase() !== input.buyerAddress.toLowerCase()) throw new Error("VERITY_BOND_CALLER_MISMATCH: bond was not posted by the buyer address");
     if (String(value.amount) !== input.amountTinybars) throw new Error("VERITY_BOND_AMOUNT_MISMATCH: posted amount does not match the dispute bond");
     if (typeof value.function_parameters !== "string") throw new Error("VERITY_BOND_PARAMETERS_MISSING: contract result omitted function parameters");
+    const functionParameters = value.function_parameters.toLowerCase();
     let decoded: readonly unknown[];
+    let functionName: "postBond" | "postBondWithExpiry";
     try {
-      decoded = POST_BOND_INTERFACE.decodeFunctionData("postBond", value.function_parameters) as unknown as readonly unknown[];
+      if (POST_BOND_SELECTOR && functionParameters.startsWith(POST_BOND_SELECTOR.toLowerCase())) {
+        functionName = "postBond";
+        decoded = POST_BOND_INTERFACE.decodeFunctionData(functionName, value.function_parameters) as unknown as readonly unknown[];
+      } else if (POST_BOND_WITH_EXPIRY_SELECTOR && functionParameters.startsWith(POST_BOND_WITH_EXPIRY_SELECTOR.toLowerCase())) {
+        functionName = "postBondWithExpiry";
+        decoded = POST_BOND_WITH_EXPIRY_INTERFACE.decodeFunctionData(functionName, value.function_parameters) as unknown as readonly unknown[];
+        assertPositiveExpiry(decoded[2]);
+      } else {
+        throw new Error("unsupported function selector");
+      }
     } catch (error) {
-      throw new Error("VERITY_BOND_FUNCTION_MISMATCH: transaction was not a postBond call", { cause: error });
+      throw new Error("VERITY_BOND_FUNCTION_MISMATCH: transaction was not a supported bond call", { cause: error });
     }
     if (String(decoded[0]).toLowerCase() !== bytes32Hex(input.disputeId).toLowerCase()
       || String(decoded[1]).toLowerCase() !== bytes32Hex(input.providerRoot).toLowerCase()) {
-      throw new Error("VERITY_BOND_ARGUMENT_MISMATCH: postBond keys do not match the dispute");
+      throw new Error(`VERITY_BOND_ARGUMENT_MISMATCH: ${functionName} keys do not match the dispute`);
     }
   }
 }
@@ -77,6 +91,14 @@ export function toMirrorTransactionId(value: string): string {
 
 function bytes32Hex(value: string): string {
   return `0x${Buffer.from(toBytes32(value)).toString("hex")}`;
+}
+
+function assertPositiveExpiry(value: unknown): void {
+  try {
+    if (BigInt(String(value)) <= 0n) throw new Error("expiry is not positive");
+  } catch (error) {
+    throw new Error("VERITY_BOND_EXPIRY_INVALID: expiring bond call has an invalid expiry", { cause: error });
+  }
 }
 
 function isContractResult(value: unknown): value is ContractResult {
