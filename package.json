@@ -24,6 +24,8 @@
     "register:graph-agent": "tsx scripts/register-graph-agent.ts",
     "register:agent": "tsx scripts/register-agent.ts",
     "publish:agent0-feedback": "tsx scripts/publish-agent0-feedback.ts",
+    "graph:prepare": "tsx scripts/prepare-graph.ts",
+    "graph:build": "npm run graph:prepare && npm --prefix graph/subgraph run build",
     "stake:provider": "tsx scripts/stake-provider.ts",
     "content:start": "npm --workspace @verity/content-service start",
     "disputes:start": "npm --workspace @verity/disputes start",

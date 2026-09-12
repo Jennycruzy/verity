@@ -1,0 +1,30 @@
+specVersion: v0.1.0
+package:
+  name: verity_agent_feedback
+  version: v0.1.0
+  description: Standard ERC-8004 identity and reputation events used by Verity routing.
+  url: https://github.com/Jennycruzy/verity/tree/main/graph/substreams
+
+network: ${GRAPH_SUBGRAPH_NETWORK}
+
+imports:
+  ethereum_common: https://spkg.io/v1/packages/ethereum-common/v0.3.3
+
+modules:
+  - name: feedback_events
+    use: ethereum_common:filtered_events
+    initialBlock: ${GRAPH_SUBSTREAM_START_BLOCK}
+
+  - name: feedback_revocations
+    use: ethereum_common:filtered_events
+    initialBlock: ${GRAPH_SUBSTREAM_START_BLOCK}
+
+  - name: identity_events
+    use: ethereum_common:filtered_events
+    initialBlock: ${GRAPH_SUBSTREAM_START_BLOCK}
+
+params:
+  feedback_events: evt_addr:${GRAPH_FEEDBACK_REPUTATION_REGISTRY} evt_sig:0x6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc
+  feedback_revocations: evt_addr:${GRAPH_FEEDBACK_REPUTATION_REGISTRY} evt_sig:0x25156fd3288212246d8b008d5921fde376c71ed14ac2e072a506eb06fde6d09d
+  identity_events: evt_addr:${GRAPH_FEEDBACK_IDENTITY_REGISTRY} evt_sig:0xca52e62c367d81bb2e328eb795f7c7ba24afb478408a26c0e201d155c449bc4a
+
