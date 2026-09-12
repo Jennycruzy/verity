@@ -146,7 +146,7 @@ The Graph data path is implemented as an address-filtered Substreams package fee
 npm run graph:build
 ```
 
-`graph:build` verifies live registry bytecode, discovers the chain ID, packs the filtered stream, generates the Subgraph manifest, and compiles its mapping. Deploy the generated `graph/subgraph/build/` artifact through Subgraph Studio and set `GRAPH_SUBGRAPH_URL` to the resulting query endpoint. This local build does not count as hosted evidence; the README will only claim that after a successful Studio deployment.
+`graph:build` verifies live registry bytecode, discovers the chain ID, packs the filtered stream, generates the Subgraph manifest, and compiles its mapping. Create the Subgraph in Studio, then set `GRAPH_STUDIO_SUBGRAPH`, `GRAPH_STUDIO_DEPLOY_KEY`, and a new `GRAPH_STUDIO_VERSION_LABEL`. Run `npm run graph:deploy` and set `GRAPH_SUBGRAPH_URL` to the resulting query endpoint. The deploy key is passed only to the official CLI and is redacted from command errors. No blockchain funding is needed to deploy the Subgraph; Graph Studio access is required. This local build does not count as hosted evidence; the README will only claim that after a successful Studio deployment.
 
 The paid query service keeps the hosted Graph credential on the server and exposes a read-only x402 resource at `POST /query`:
 
