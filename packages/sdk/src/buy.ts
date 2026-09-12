@@ -123,7 +123,9 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   }
   providerResponses.forEach((reference, index) => assertContentReference(reference, `providerResponses[${index}]`));
 
-  const contentStore = options.contentStore ?? new HttpContentStore(requiredEnvironment("CONTENT_STORE_BASE_URL"));
+  const contentStore = options.contentStore ?? new HttpContentStore(requiredEnvironment("CONTENT_STORE_BASE_URL"), fetchImpl, {
+    ...(process.env.CONTENT_STORE_WRITE_TOKEN?.trim() ? { writeToken: process.env.CONTENT_STORE_WRITE_TOKEN.trim() } : {})
+  });
   const replayValue = options.evaluationInput === undefined
     ? replayInput(options.evaluate, data)
     : typeof options.evaluationInput === "function"

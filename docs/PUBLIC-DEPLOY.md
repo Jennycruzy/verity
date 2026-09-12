@@ -38,6 +38,7 @@ Set the deployment values in `.env` without committing the file:
 VERITY_DOMAIN=<domain>
 CONTENT_STORE_BASE_URL=https://content.<domain>
 CONTENT_STORE_PUBLIC_URL=https://content.<domain>
+CONTENT_STORE_WRITE_TOKEN=<long-random-upload-token>
 VERITY_DISPUTE_URL=https://disputes.<domain>/disputes
 VERITY_DISPUTE_HEALTH_URL=https://disputes.<domain>/health
 VERITY_DEMO_PROVIDER_URL=https://fx.<domain>/fx
@@ -63,6 +64,16 @@ WORLD_ID_ENVIRONMENT=production
 Copy the Hedera account credentials and the already-provisioned topic/contract values from the local `.env` only over a secure connection. Do not paste private keys into GitHub, Discord, or this repository. The Graph signer private keys are only needed by the local registration/feedback commands; they do not belong in the public image.
 
 Before registering the two Agent0 identities, run `npm run graph:check-signers`. It prints only the two public addresses and reports whether either needs Base Sepolia ETH. No Hedera top-up is needed for this check.
+
+After deploying the Subgraph in Studio, verify the hosted data source before starting the gateway:
+
+```sh
+npm run graph:check-hosted
+```
+
+This sends only the standard `_meta` read query, prints the indexed block number, and never prints the Graph credential. The public gateway exposes the same check at `/ready`; `npm run public:check` fails if the process is alive but the hosted index is unavailable.
+
+The content service keeps replay reads public but protects object uploads when `CONTENT_STORE_WRITE_TOKEN` is set. Use a long random token on a public deployment and copy it only to the buyer machine's private `.env`.
 
 ## 3. Start and smoke-test
 

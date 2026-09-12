@@ -39,6 +39,11 @@ export async function handleContentRequest(request: IncomingMessage, response: S
     return;
   }
   if (request.method === "PUT") {
+    if (config.writeToken && authorizationHeader(request) !== `Bearer ${config.writeToken}`) {
+      response.setHeader("www-authenticate", "Bearer");
+      writeJson(response, 401, { error: "content_write_auth_required" });
+      return;
+    }
     await storeContent(request, response, config, filePath, hash);
     return;
   }
@@ -125,6 +130,11 @@ function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
 
 function isFileExists(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+function authorizationHeader(request: IncomingMessage): string | undefined {
+  const value = request.headers.authorization;
+  return Array.isArray(value) ? value[0] : value;
 }
 
 class BodyTooLargeError extends Error {

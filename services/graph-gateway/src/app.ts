@@ -8,6 +8,12 @@ interface GraphQuery {
   readonly operationName?: string;
 }
 
+const GRAPH_READINESS_QUERY = "query VerityGraphReadiness { _meta { block { number } } }";
+
+export interface GraphReadiness {
+  readonly blockNumber: string;
+}
+
 export function createGraphGatewayServer(config: GraphGatewayConfig, fetchImpl: typeof fetch = fetch) {
   const queryHandler = protect(createGraphQueryHandler(config, fetchImpl), {
     price: config.price,
@@ -15,10 +21,39 @@ export function createGraphGatewayServer(config: GraphGatewayConfig, fetchImpl: 
     description: "Verity provider reliability and buyer honesty query"
   });
   return createServer((request, response) => {
-    void route(request, response, queryHandler).catch((error: unknown) => {
+    void route(request, response, queryHandler, () => checkGraphReadiness(config, fetchImpl)).catch((error: unknown) => {
       if (!response.writableEnded) writeJson(response, statusFor(error), { error: messageFor(error) });
     });
   });
+}
+
+export async function checkGraphReadiness(config: GraphGatewayConfig, fetchImpl: typeof fetch = fetch): Promise<GraphReadiness> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+  try {
+    const response = await fetchImpl(config.subgraphUrl, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        authorization: `Bearer ${config.upstreamApiKey}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ query: GRAPH_READINESS_QUERY })
+    });
+    const raw = await response.text();
+    const value = parseUpstreamJson(raw);
+    if (!response.ok) throw new Error(`VERITY_GRAPH_READY_HTTP: hosted Graph returned ${response.status}`);
+    if (hasGraphErrors(value)) throw new Error(`VERITY_GRAPH_READY_QUERY: hosted Graph returned ${JSON.stringify(value.errors)}`);
+    const blockNumber = readBlockNumber(value);
+    return { blockNumber };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`VERITY_GRAPH_READY_TIMEOUT: hosted Graph exceeded ${config.requestTimeoutMs}ms`, { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function createGraphQueryHandler(config: GraphGatewayConfig, fetchImpl: typeof fetch = fetch): ProtectedApplication {
@@ -57,9 +92,19 @@ export function createGraphQueryHandler(config: GraphGatewayConfig, fetchImpl: t
   };
 }
 
-async function route(request: IncomingMessage, response: ServerResponse, queryHandler: ProtectedApplication): Promise<void> {
+async function route(
+  request: IncomingMessage,
+  response: ServerResponse,
+  queryHandler: ProtectedApplication,
+  readiness: () => Promise<GraphReadiness>
+): Promise<void> {
   if (request.method === "GET" && pathOf(request.url ?? "/") === "/health") {
     writeJson(response, 200, { status: "ok", source: "graph-gateway" });
+    return;
+  }
+  if (request.method === "GET" && pathOf(request.url ?? "/") === "/ready") {
+    const result = await readiness();
+    writeJson(response, 200, { status: "ready", source: "graph-gateway", ...result });
     return;
   }
   await queryHandler({
@@ -115,6 +160,20 @@ function parseUpstreamJson(text: string): unknown {
   }
 }
 
+function hasGraphErrors(value: unknown): value is { readonly errors: readonly unknown[] } {
+  return isRecord(value) && Array.isArray(value.errors) && value.errors.length > 0;
+}
+
+function readBlockNumber(value: unknown): string {
+  if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.data._meta) || !isRecord(value.data._meta.block)) {
+    throw new Error("VERITY_GRAPH_READY_SCHEMA: hosted Graph omitted data._meta.block.number");
+  }
+  const raw = value.data._meta.block.number;
+  const blockNumber = typeof raw === "number" && Number.isSafeInteger(raw) ? String(raw) : typeof raw === "string" ? raw.trim() : "";
+  if (!/^\d+$/.test(blockNumber)) throw new Error("VERITY_GRAPH_READY_SCHEMA: hosted Graph returned an invalid block number");
+  return blockNumber;
+}
+
 function pathOf(url: string): string {
   return url.split("?", 1)[0] ?? "/";
 }
@@ -128,6 +187,10 @@ function statusFor(error: unknown): number {
 
 function messageFor(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function writeJson(response: ServerResponse, statusCode: number, value: unknown): void {

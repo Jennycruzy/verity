@@ -46,7 +46,9 @@ services:
       PORT: "8080"
       PROVIDER_KIND: fx
       DEGRADE_MODE: "true"
-      VERITY_PROVIDER_PUBLIC_URL: https://bad-fx.${VERITY_DOMAIN}
+      VERITY_PROVIDER_PUBLIC_URL: ""
+      VERITY_ERC8004_REGISTRY: ""
+      VERITY_ERC8004_AGENT_ID: ""
 
   fx-secondary:
     <<: *node
@@ -55,7 +57,9 @@ services:
       PORT: "8080"
       PROVIDER_KIND: fx
       DEGRADE_MODE: "false"
-      VERITY_PROVIDER_PUBLIC_URL: https://fx-secondary.${VERITY_DOMAIN}
+      VERITY_PROVIDER_PUBLIC_URL: ""
+      VERITY_ERC8004_REGISTRY: ""
+      VERITY_ERC8004_AGENT_ID: ""
 
   checker:
     build:

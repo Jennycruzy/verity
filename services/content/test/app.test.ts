@@ -40,11 +40,29 @@ test("rejects uploads whose path hash does not match the bytes", async () => {
   }
 });
 
-function requestForTest(method: string, url: string, body = "") {
+test("requires the configured bearer token for public writes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "verity-content-"));
+  const body = '{"secured":true}';
+  const hash = sha256(body);
+  const config = { port: 1, directory, publicUrl: "http://content.invalid", maxBytes: 1024, writeToken: "write-secret" };
+  try {
+    const unauthorized = responseForTest();
+    await handleContentRequest(requestForTest("PUT", `/content/${hash}`, body), unauthorized.response, config);
+    assert.equal(unauthorized.response.statusCode, 401);
+
+    const authorized = responseForTest();
+    await handleContentRequest(requestForTest("PUT", `/content/${hash}`, body, { authorization: "Bearer write-secret" }), authorized.response, config);
+    assert.equal(authorized.response.statusCode, 201);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+function requestForTest(method: string, url: string, body = "", extraHeaders: Record<string, string> = {}) {
   const request = Readable.from(body ? [Buffer.from(body)] : []) as Readable & { method: string; url: string; headers: Record<string, string> };
   request.method = method;
   request.url = url;
-  request.headers = method === "PUT" ? { "content-type": "application/json" } : {};
+  request.headers = method === "PUT" ? { "content-type": "application/json", ...extraHeaders } : extraHeaders;
   return request as never;
 }
 

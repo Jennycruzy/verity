@@ -154,6 +154,14 @@ npm run graph:build
 
 `graph:build` verifies live registry bytecode, discovers the chain ID, packs the filtered stream, generates the Subgraph manifest, and compiles its mapping. Create the Subgraph in Studio, then set `GRAPH_STUDIO_SUBGRAPH`, `GRAPH_STUDIO_DEPLOY_KEY`, and a new `GRAPH_STUDIO_VERSION_LABEL`. Run `npm run graph:deploy`, set `GRAPH_STUDIO_QUERY_URL` to the resulting Studio query endpoint, and set `GRAPH_SUBGRAPH_URL` to the public paid `/query` URL when the gateway is deployed. The deploy key is passed only to the official CLI and is redacted from command errors. No blockchain funding is needed to deploy the Subgraph; Graph Studio access is required. This local build does not count as hosted evidence; the README will only claim that after a successful Studio deployment.
 
+Verify the hosted Graph endpoint independently before wiring the gateway or explorer to it:
+
+```sh
+npm run graph:check-hosted
+```
+
+The check runs the standard Graph `_meta` query, validates a live indexed block, and never prints the API credential. A public deployment also exposes this check as `GET /ready` on the reputation hostname.
+
 The Graph feedback publisher needs separate Base Sepolia signers for the provider and buyer. Generate them locally once with `npm run provision:graph-signers`; only public addresses are printed and the keys are written to ignored `.env`. Run `npm run graph:check-signers` to print both public addresses and their live balances without printing keys. Fund any signer reported as `funding-required` with a small amount of Base Sepolia ETH before `npm run register:graph-agent -- provider` and `npm run register:graph-agent -- buyer`.
 
 The paid query service keeps the hosted Graph credential on the server and exposes a read-only x402 resource at `POST /query`:
@@ -163,6 +171,8 @@ npm run graph:gateway
 ```
 
 Set `GRAPH_GATEWAY_PRICE`, `GRAPH_GATEWAY_UPSTREAM_API_KEY`, and `GRAPH_STUDIO_QUERY_URL` first. The service rejects mutations, subscriptions, oversized bodies, invalid upstream JSON, and upstream timeouts. Point the buying agent's `GRAPH_SUBGRAPH_URL` at this public `/query` URL so reputation lookup is a real paid dependency rather than decorative data access. The explorer uses `GRAPH_STUDIO_QUERY_URL` directly with `GRAPH_API_KEY`; it never points at the paid gateway or bypasses its own server-side query credential.
+
+For a public content service, set `CONTENT_STORE_WRITE_TOKEN`. Replay reads remain public by hash, while buyer uploads require `Authorization: Bearer <token>`; the SDK reads the token from the ignored environment file.
 
 The routing proof uses that paid transport directly. Set `GRAPH_MIN_RELIABILITY`, `GRAPH_ROUTE_CANDIDATES_JSON`, and the two Agent0 query files, then run `npm run graph:route`. It prints the selected endpoint and queried score. Changing the indexed score changes the selected provider; deleting the Subgraph or removing the x402 resource causes the command to fail instead of silently using a local cache.
 

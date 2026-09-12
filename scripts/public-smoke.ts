@@ -15,6 +15,7 @@ const checks = [
   ["checker", "checker", "/health"],
   ["explorer", "explorer", "/health"],
   ["reputation", "reputation", "/health"],
+  ["reputation-ready", "reputation", "/ready"],
   ["identity", "identity", "/health"]
 ] as const;
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 import test from "node:test";
-import { createGraphQueryHandler } from "../src/app.ts";
+import { checkGraphReadiness, createGraphQueryHandler } from "../src/app.ts";
 import type { GraphGatewayConfig } from "../src/config.ts";
 
 const config: GraphGatewayConfig = {
@@ -45,6 +45,23 @@ test("refuses mutations before contacting the hosted Graph endpoint", async () =
     /VERITY_GRAPH_QUERY_READ_ONLY/
   );
   assert.equal(called, false);
+});
+
+test("requires a live hosted Graph block for readiness", async () => {
+  let authorization = "";
+  const result = await checkGraphReadiness(config, async (_input, init) => {
+    authorization = new Headers(init?.headers).get("authorization") ?? "";
+    return new Response(JSON.stringify({ data: { _meta: { block: { number: "12345" } } } }), { status: 200 });
+  });
+  assert.deepEqual(result, { blockNumber: "12345" });
+  assert.equal(authorization, "Bearer private-token");
+});
+
+test("fails readiness when the hosted Graph reports an error", async () => {
+  await assert.rejects(
+    checkGraphReadiness(config, async () => new Response(JSON.stringify({ errors: [{ message: "subgraph unavailable" }] }), { status: 200 })),
+    /VERITY_GRAPH_READY_QUERY/
+  );
 });
 
 function requestForTest(body: string): Readable & { method: string; url: string; headers: Record<string, string> } {

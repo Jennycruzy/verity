@@ -7,15 +7,23 @@ export interface ContentStore {
 
 type FetchLike = typeof fetch;
 
+export interface HttpContentStoreOptions {
+  readonly writeToken?: string;
+}
+
 export class HttpContentStore implements ContentStore {
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
+  private readonly writeToken?: string;
 
-  public constructor(baseUrl: string, fetchImpl: FetchLike = fetch) {
+  public constructor(baseUrl: string, fetchImpl: FetchLike = fetch, options: HttpContentStoreOptions = {}) {
     const normalized = baseUrl.trim().replace(/\/$/, "");
     if (!normalized) throw new Error("VERITY_CONTENT_URL_EMPTY: set CONTENT_STORE_BASE_URL");
     this.baseUrl = normalized;
     this.fetchImpl = fetchImpl;
+    const writeToken = options.writeToken?.trim();
+    if (writeToken === "") throw new Error("VERITY_CONTENT_WRITE_TOKEN_EMPTY: omit writeToken or provide a non-empty token");
+    if (writeToken) this.writeToken = writeToken;
   }
 
   public async putJson(value: unknown): Promise<ContentReference> {
@@ -24,7 +32,10 @@ export class HttpContentStore implements ContentStore {
     const uri = `${this.baseUrl}/content/${hash}`;
     const response = await this.fetchImpl(uri, {
       method: "PUT",
-      headers: { "content-type": "application/json; charset=utf-8" },
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        ...(this.writeToken ? { authorization: `Bearer ${this.writeToken}` } : {})
+      },
       body
     });
     const raw = await response.text();
