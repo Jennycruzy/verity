@@ -1,0 +1,5 @@
+{
+  "format": "agent0-v1",
+  "query": "query VerityAgent0Buyer($agentId: ID!) { agent(id: $agentId) { id feedback(where: { tag1: \"verity-buyer\", isRevoked: false }, orderBy: createdAt, orderDirection: asc) { value tag1 isRevoked } } }",
+  "variables": {}
+}

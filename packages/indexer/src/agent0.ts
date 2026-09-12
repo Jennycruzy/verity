@@ -1,5 +1,5 @@
-import type { ProviderReputation } from "./client.js";
-import { VERITY_PROVIDER_FEEDBACK_TAG } from "./reputation-registry.js";
+import type { BuyerReputation, ProviderReputation } from "./client.js";
+import { VERITY_BUYER_FEEDBACK_TAG, VERITY_PROVIDER_FEEDBACK_TAG } from "./reputation-registry.js";
 
 interface Agent0Feedback {
   readonly value: unknown;
@@ -31,8 +31,21 @@ export function parseAgent0Provider(value: unknown, requestedAgentId: string): P
   const relevant = feedback.filter((entry) => entry.tag1 === VERITY_PROVIDER_FEEDBACK_TAG && entry.isRevoked === false);
   const endpoint = readEndpoint(agent.registrationFile, relevant);
   if (!endpoint) throw new Error(`VERITY_AGENT0_PROVIDER_SCHEMA: ${agentId} has no HTTP endpoint in registrationFile.webEndpoint or feedback.endpoint`);
-  const reliabilityScore = averageFeedback(relevant, agentId);
+  const reliabilityScore = averageFeedback(relevant, agentId, "provider");
   return { agentId, endpoint, reliabilityScore, completedRequests: relevant.length };
+}
+
+export function parseAgent0Buyer(value: unknown, requestedRoot: string): BuyerReputation {
+  const agentId = normalizeAgent0Id(requestedRoot);
+  const agent = unwrapAgent(value);
+  if (agent.id !== agentId) throw new Error(`VERITY_AGENT0_BUYER_SCHEMA: response identified ${String(agent.id)} instead of ${agentId}`);
+  const feedback = readFeedback(agent.feedback);
+  const relevant = feedback.filter((entry) => entry.tag1 === VERITY_BUYER_FEEDBACK_TAG && entry.isRevoked === false);
+  return {
+    root: requestedRoot.trim(),
+    honestyScore: averageFeedback(relevant, agentId, "buyer"),
+    disputes: relevant.length
+  };
 }
 
 function unwrapAgent(value: unknown): Agent0Agent {
@@ -63,7 +76,7 @@ function readEndpoint(registrationFile: unknown, feedback: readonly Agent0Feedba
   return undefined;
 }
 
-function averageFeedback(feedback: readonly Agent0Feedback[], agentId: string): number {
+function averageFeedback(feedback: readonly Agent0Feedback[], agentId: string, subject: "provider" | "buyer"): number {
   if (feedback.length === 0) return 0;
   const scale = 10n ** 18n;
   let total = 0n;
@@ -72,13 +85,13 @@ function averageFeedback(feedback: readonly Agent0Feedback[], agentId: string): 
     const text = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
     const scaled = decimalToScaled(text, `feedback[${index}].value`);
     if (scaled < 0n || scaled > scale) {
-      throw new Error(`VERITY_AGENT0_PROVIDER_SCHEMA: ${agentId} feedback values must be between 0 and 1`);
+      throw new Error(`VERITY_AGENT0_${subject.toUpperCase()}_SCHEMA: ${agentId} feedback values must be between 0 and 1`);
     }
     total += scaled;
   }
   const average = Number(total / BigInt(feedback.length)) / Number(scale);
   if (!Number.isFinite(average) || average < 0 || average > 1) {
-    throw new Error(`VERITY_AGENT0_PROVIDER_SCHEMA: ${agentId} reliability average was outside 0 through 1`);
+    throw new Error(`VERITY_AGENT0_${subject.toUpperCase()}_SCHEMA: ${agentId} reputation average was outside 0 through 1`);
   }
   return average;
 }
