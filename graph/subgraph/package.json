@@ -1,0 +1,14 @@
+{
+  "name": "@verity/agent0-subgraph",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph codegen && graph build",
+    "prepare": "node ../../scripts/prepare-graph.ts"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.73.0",
+    "@graphprotocol/graph-ts": "0.34.0"
+  }
+}

@@ -2,4 +2,5 @@
 build/
 generated/
 node_modules/
-
+subgraph/subgraph.yaml
+subgraph/src/config.ts
