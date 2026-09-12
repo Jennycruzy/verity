@@ -13,6 +13,17 @@ export interface BondVerifier {
   verify(input: BondVerificationInput): Promise<void>;
 }
 
+export interface StakeVerificationInput {
+  readonly transactionId: string;
+  readonly providerRoot: string;
+  readonly providerAddress: string;
+  readonly amountTinybars: string;
+}
+
+export interface StakeVerifier {
+  verify(input: StakeVerificationInput): Promise<void>;
+}
+
 interface ContractResult {
   readonly contract_id?: unknown;
   readonly from?: unknown;
@@ -23,8 +34,10 @@ interface ContractResult {
 
 const POST_BOND_INTERFACE = new Interface(["function postBond(bytes32 disputeId, bytes32 providerRoot) payable"]);
 const POST_BOND_WITH_EXPIRY_INTERFACE = new Interface(["function postBondWithExpiry(bytes32 disputeId, bytes32 providerRoot, uint256 expiresAt) payable"]);
+const STAKE_PROVIDER_INTERFACE = new Interface(["function stakeProvider(bytes32 providerRoot) payable"]);
 const POST_BOND_SELECTOR = POST_BOND_INTERFACE.getFunction("postBond")?.selector;
 const POST_BOND_WITH_EXPIRY_SELECTOR = POST_BOND_WITH_EXPIRY_INTERFACE.getFunction("postBondWithExpiry")?.selector;
+const STAKE_PROVIDER_SELECTOR = STAKE_PROVIDER_INTERFACE.getFunction("stakeProvider")?.selector;
 
 export class MirrorBondVerifier implements BondVerifier {
   private readonly baseUrl: string;
@@ -77,6 +90,54 @@ export class MirrorBondVerifier implements BondVerifier {
     if (String(decoded[0]).toLowerCase() !== bytes32Hex(input.disputeId).toLowerCase()
       || String(decoded[1]).toLowerCase() !== bytes32Hex(input.providerRoot).toLowerCase()) {
       throw new Error(`VERITY_BOND_ARGUMENT_MISMATCH: ${functionName} keys do not match the dispute`);
+    }
+  }
+}
+
+export class MirrorStakeVerifier implements StakeVerifier {
+  private readonly baseUrl: string;
+
+  public constructor(
+    mirrorNodeBaseUrl: string,
+    private readonly escrowContractId: string,
+    private readonly fetchImpl: typeof fetch = fetch
+  ) {
+    const normalized = normalizeMirrorNodeBaseUrl(mirrorNodeBaseUrl);
+    if (!escrowContractId.trim()) throw new Error("VERITY_ESCROW_CONTRACT_ID_MISSING: set the deployed escrow contract ID");
+    if (!/^0\.0\.\d+$/.test(escrowContractId)) throw new Error("VERITY_ESCROW_CONTRACT_ID_INVALID: use a Hedera contract ID in 0.0.N format");
+    this.baseUrl = normalized;
+  }
+
+  public async verify(input: StakeVerificationInput): Promise<void> {
+    const transactionId = toMirrorTransactionId(input.transactionId);
+    const response = await this.fetchImpl(`${this.baseUrl}/contracts/results/${encodeURIComponent(transactionId)}`);
+    const raw = await response.text();
+    let value: unknown;
+    try {
+      value = JSON.parse(raw);
+    } catch (error) {
+      throw new Error("VERITY_STAKE_MIRROR_JSON: Mirror Node returned invalid JSON", { cause: error });
+    }
+    if (!response.ok || !isContractResult(value)) {
+      throw new Error(`VERITY_STAKE_NOT_VERIFIED: Mirror Node did not return a successful contract result for ${input.transactionId}`);
+    }
+    if (value.result !== "SUCCESS") throw new Error(`VERITY_STAKE_NOT_VERIFIED: transaction ${input.transactionId} did not succeed`);
+    if (value.contract_id !== this.escrowContractId) throw new Error("VERITY_STAKE_CONTRACT_MISMATCH: stake transaction targeted another contract");
+    if (String(value.from).toLowerCase() !== input.providerAddress.toLowerCase()) throw new Error("VERITY_STAKE_CALLER_MISMATCH: stake was not posted by the provider address");
+    if (String(value.amount) !== input.amountTinybars) throw new Error("VERITY_STAKE_AMOUNT_MISMATCH: posted amount does not match the provider stake");
+    if (typeof value.function_parameters !== "string") throw new Error("VERITY_STAKE_PARAMETERS_MISSING: contract result omitted function parameters");
+    const functionParameters = value.function_parameters.toLowerCase();
+    if (!STAKE_PROVIDER_SELECTOR || !functionParameters.startsWith(STAKE_PROVIDER_SELECTOR.toLowerCase())) {
+      throw new Error("VERITY_STAKE_FUNCTION_MISMATCH: transaction was not a stakeProvider call");
+    }
+    let decoded: readonly unknown[];
+    try {
+      decoded = STAKE_PROVIDER_INTERFACE.decodeFunctionData("stakeProvider", value.function_parameters) as unknown as readonly unknown[];
+    } catch (error) {
+      throw new Error("VERITY_STAKE_FUNCTION_MISMATCH: transaction was not a valid stakeProvider call", { cause: error });
+    }
+    if (String(decoded[0]).toLowerCase() !== bytes32Hex(input.providerRoot).toLowerCase()) {
+      throw new Error("VERITY_STAKE_ARGUMENT_MISMATCH: stake provider root does not match the registry record");
     }
   }
 }

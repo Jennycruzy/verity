@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { Interface } from "ethers";
 import test from "node:test";
 import { toBytes32 } from "@verity/hcs";
-import { MirrorBondVerifier, toMirrorTransactionId } from "../src/bond.ts";
+import { MirrorBondVerifier, MirrorStakeVerifier, toMirrorTransactionId } from "../src/bond.ts";
 
 const contractId = "0.0.10";
 const buyerAddress = `0x${"02".repeat(20)}`;
+const providerAddress = `0x${"03".repeat(20)}`;
 const providerRoot = "provider-root";
 
 test("verifies a successful postBond contract result from Mirror Node", async () => {
@@ -25,6 +26,15 @@ test("verifies a successful postBondWithExpiry contract result from Mirror Node"
     return new Response(JSON.stringify({ contract_id: contractId, from: buyerAddress, amount: "10", function_parameters: parameters, result: "SUCCESS" }), { status: 200 });
   });
   await verifier.verify({ transactionId: "0.0.9@1.000000000", disputeId: "dispute-1", providerRoot, buyerAddress, amountTinybars: "10" });
+});
+
+test("verifies a provider stake transaction from Mirror Node", async () => {
+  const abi = new Interface(["function stakeProvider(bytes32 providerRoot) payable"]);
+  const parameters = abi.encodeFunctionData("stakeProvider", [bytes32(providerRoot)]);
+  const verifier = new MirrorStakeVerifier("https://mirror.invalid/api/v1", contractId, async () => {
+    return new Response(JSON.stringify({ contract_id: contractId, from: providerAddress, amount: "20", function_parameters: parameters, result: "SUCCESS" }), { status: 200 });
+  });
+  await verifier.verify({ transactionId: "0.0.9@1.000000000", providerRoot, providerAddress, amountTinybars: "20" });
 });
 
 test("rejects a bond result with the wrong amount", async () => {
