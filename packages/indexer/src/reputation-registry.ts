@@ -11,20 +11,31 @@ const REPUTATION_REGISTRY_ABI = [
 const REPUTATION_REGISTRY_INTERFACE = new Interface(REPUTATION_REGISTRY_ABI);
 
 export const VERITY_PROVIDER_FEEDBACK_TAG = "verity-provider" as const;
+export const VERITY_BUYER_FEEDBACK_TAG = "verity-buyer" as const;
 export const VERITY_PROVIDER_FEEDBACK_DECIMALS = 2 as const;
 
-export interface VerityProviderFeedback {
+export interface VerityAgentFeedback {
   readonly agentId: string;
   readonly value: "0" | "100";
   readonly valueDecimals: typeof VERITY_PROVIDER_FEEDBACK_DECIMALS;
-  readonly tag1: typeof VERITY_PROVIDER_FEEDBACK_TAG;
-  readonly tag2: "correct" | "incorrect";
+  readonly tag1: typeof VERITY_PROVIDER_FEEDBACK_TAG | typeof VERITY_BUYER_FEEDBACK_TAG;
+  readonly tag2: "correct" | "incorrect" | "honest" | "dishonest";
   readonly endpoint: string;
   readonly feedbackURI: string;
   readonly feedbackHash: string;
 }
 
-export interface Erc8004FeedbackTransaction extends VerityProviderFeedback {
+export type VerityProviderFeedback = VerityAgentFeedback & {
+  readonly tag1: typeof VERITY_PROVIDER_FEEDBACK_TAG;
+  readonly tag2: "correct" | "incorrect";
+};
+
+export type VerityBuyerFeedback = VerityAgentFeedback & {
+  readonly tag1: typeof VERITY_BUYER_FEEDBACK_TAG;
+  readonly tag2: "honest" | "dishonest";
+};
+
+export interface Erc8004FeedbackTransaction extends VerityAgentFeedback {
   readonly transactionHash: string;
   readonly feedbackIndex: string;
   readonly clientAddress: string;
@@ -37,8 +48,58 @@ export function createVerityProviderFeedback(input: {
   readonly feedbackURI?: string;
   readonly feedbackHash?: string;
 }): VerityProviderFeedback {
+  return createVerityFeedback({
+    agentId: input.agentId,
+    outcome: input.providerWasCorrect,
+    subject: "provider",
+    endpoint: input.endpoint,
+    ...(input.feedbackURI === undefined ? {} : { feedbackURI: input.feedbackURI }),
+    ...(input.feedbackHash === undefined ? {} : { feedbackHash: input.feedbackHash })
+  });
+}
+
+export function createVerityBuyerFeedback(input: {
+  readonly agentId: string;
+  readonly buyerWasHonest: boolean;
+  readonly endpoint?: string;
+  readonly feedbackURI?: string;
+  readonly feedbackHash?: string;
+}): VerityBuyerFeedback {
+  return createVerityFeedback({
+    agentId: input.agentId,
+    outcome: input.buyerWasHonest,
+    subject: "buyer",
+    ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
+    ...(input.feedbackURI === undefined ? {} : { feedbackURI: input.feedbackURI }),
+    ...(input.feedbackHash === undefined ? {} : { feedbackHash: input.feedbackHash })
+  });
+}
+
+interface ProviderFeedbackInput {
+  readonly agentId: string;
+  readonly outcome: boolean;
+  readonly subject: "provider";
+  readonly endpoint: string;
+  readonly feedbackURI?: string;
+  readonly feedbackHash?: string;
+}
+
+interface BuyerFeedbackInput {
+  readonly agentId: string;
+  readonly outcome: boolean;
+  readonly subject: "buyer";
+  readonly endpoint?: string;
+  readonly feedbackURI?: string;
+  readonly feedbackHash?: string;
+}
+
+function createVerityFeedback(input: ProviderFeedbackInput): VerityProviderFeedback;
+function createVerityFeedback(input: BuyerFeedbackInput): VerityBuyerFeedback;
+function createVerityFeedback(input: ProviderFeedbackInput | BuyerFeedbackInput): VerityProviderFeedback | VerityBuyerFeedback {
   const agentId = normalizeErc8004AgentId(input.agentId);
-  const endpoint = requiredHttpUrl(input.endpoint, "endpoint");
+  const endpoint = input.subject === "provider"
+    ? requiredHttpUrl(input.endpoint ?? "", "endpoint")
+    : input.endpoint === undefined ? "" : requiredHttpUrl(input.endpoint, "endpoint");
   const feedbackURI = input.feedbackURI?.trim() ?? "";
   if (feedbackURI && !/^(https?|ipfs|data):/.test(feedbackURI)) {
     throw new Error("VERITY_ERC8004_FEEDBACK_URI_INVALID: use an HTTP(S), IPFS, or data URI");
@@ -50,12 +111,24 @@ export function createVerityProviderFeedback(input: {
   if (!feedbackURI && feedbackHash !== zeroHash()) {
     throw new Error("VERITY_ERC8004_FEEDBACK_HASH_WITHOUT_URI: feedbackHash requires feedbackURI");
   }
+  if (input.subject === "provider") {
+    return {
+      agentId,
+      value: input.outcome ? "100" : "0",
+      valueDecimals: VERITY_PROVIDER_FEEDBACK_DECIMALS,
+      tag1: VERITY_PROVIDER_FEEDBACK_TAG,
+      tag2: input.outcome ? "correct" : "incorrect",
+      endpoint,
+      feedbackURI,
+      feedbackHash
+    };
+  }
   return {
     agentId,
-    value: input.providerWasCorrect ? "100" : "0",
+    value: input.outcome ? "100" : "0",
     valueDecimals: VERITY_PROVIDER_FEEDBACK_DECIMALS,
-    tag1: VERITY_PROVIDER_FEEDBACK_TAG,
-    tag2: input.providerWasCorrect ? "correct" : "incorrect",
+    tag1: VERITY_BUYER_FEEDBACK_TAG,
+    tag2: input.outcome ? "honest" : "dishonest",
     endpoint,
     feedbackURI,
     feedbackHash
@@ -66,6 +139,7 @@ export class Erc8004ReputationRegistryClient {
   private readonly provider: JsonRpcProvider;
   private readonly wallet: Wallet;
   private readonly contract: Contract;
+  private readonly identityContract: Contract;
   private readonly reputationRegistry: Erc8004EvmRegistry;
   private readonly identityRegistry: Erc8004EvmRegistry;
 
@@ -89,6 +163,9 @@ export class Erc8004ReputationRegistryClient {
       throw new Error("VERITY_ERC8004_SIGNER_INVALID: configured private key is not a usable ECDSA key", { cause: error });
     }
     this.contract = new Contract(this.reputationRegistry.address, REPUTATION_REGISTRY_ABI, this.wallet);
+    this.identityContract = new Contract(this.identityRegistry.address, [
+      "function ownerOf(uint256 tokenId) view returns (address)"
+    ], this.provider);
   }
 
   public get signerAddress(): string {
@@ -106,8 +183,41 @@ export class Erc8004ReputationRegistryClient {
     readonly feedbackURI?: string;
     readonly feedbackHash?: string;
   }): Promise<Erc8004FeedbackTransaction> {
-    const normalized = createVerityProviderFeedback(input);
+    return this.giveFeedback({
+      agentId: input.agentId,
+      outcome: input.providerWasCorrect,
+      subject: "provider",
+      endpoint: input.endpoint,
+      ...(input.feedbackURI === undefined ? {} : { feedbackURI: input.feedbackURI }),
+      ...(input.feedbackHash === undefined ? {} : { feedbackHash: input.feedbackHash })
+    });
+  }
+
+  public async giveBuyerFeedback(input: {
+    readonly agentId: string;
+    readonly buyerWasHonest: boolean;
+    readonly endpoint?: string;
+    readonly feedbackURI?: string;
+    readonly feedbackHash?: string;
+  }): Promise<Erc8004FeedbackTransaction> {
+    return this.giveFeedback({
+      agentId: input.agentId,
+      outcome: input.buyerWasHonest,
+      subject: "buyer",
+      ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
+      ...(input.feedbackURI === undefined ? {} : { feedbackURI: input.feedbackURI }),
+      ...(input.feedbackHash === undefined ? {} : { feedbackHash: input.feedbackHash })
+    });
+  }
+
+  private async giveFeedback(input: ProviderFeedbackInput): Promise<Erc8004FeedbackTransaction>;
+  private async giveFeedback(input: BuyerFeedbackInput): Promise<Erc8004FeedbackTransaction>;
+  private async giveFeedback(input: ProviderFeedbackInput | BuyerFeedbackInput): Promise<Erc8004FeedbackTransaction> {
+    const normalized = input.subject === "provider"
+      ? createVerityFeedback(input)
+      : createVerityFeedback(input);
     await this.assertReady();
+    await this.assertAgentExists(normalized.agentId);
     const transaction = await this.contract.getFunction("giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32)")(
       normalized.agentId,
       normalized.value,
@@ -143,6 +253,14 @@ export class Erc8004ReputationRegistryClient {
     }
     const balance = await this.provider.getBalance(this.wallet.address);
     if (balance === 0n) throw new Error(`VERITY_ERC8004_FUNDS_REQUIRED: feedback signer ${this.wallet.address} has no balance on eip155:${this.reputationRegistry.chainId}`);
+  }
+
+  private async assertAgentExists(agentId: string): Promise<void> {
+    try {
+      await this.identityContract.getFunction("ownerOf(uint256)")(agentId);
+    } catch (error) {
+      throw new Error(`VERITY_ERC8004_AGENT_NOT_FOUND: agent ${agentId} is not registered in ${this.identityRegistry.reference}`, { cause: error });
+    }
   }
 }
 

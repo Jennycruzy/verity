@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createVerityProviderFeedback, VERITY_PROVIDER_FEEDBACK_TAG } from "../src/reputation-registry.ts";
+import {
+  createVerityBuyerFeedback,
+  createVerityProviderFeedback,
+  VERITY_BUYER_FEEDBACK_TAG,
+  VERITY_PROVIDER_FEEDBACK_TAG
+} from "../src/reputation-registry.ts";
 
 test("encodes a bounded Agent0 provider feedback value", () => {
   assert.deepEqual(createVerityProviderFeedback({
@@ -44,4 +49,29 @@ test("accepts an integrity-bound feedback URI", () => {
   assert.equal(feedback.value, "0");
   assert.equal(feedback.tag2, "incorrect");
   assert.equal(feedback.feedbackURI, "ipfs://bafyverity");
+});
+
+test("encodes buyer honesty in the same Agent0 feedback schema", () => {
+  assert.deepEqual(createVerityBuyerFeedback({
+    agentId: "0009",
+    buyerWasHonest: false
+  }), {
+    agentId: "9",
+    value: "0",
+    valueDecimals: 2,
+    tag1: VERITY_BUYER_FEEDBACK_TAG,
+    tag2: "dishonest",
+    endpoint: "",
+    feedbackURI: "",
+    feedbackHash: `0x${"0".repeat(64)}`
+  });
+  assert.equal(VERITY_PROVIDER_FEEDBACK_TAG, "verity-provider");
+});
+
+test("rejects a buyer endpoint with a non-http scheme", () => {
+  assert.throws(() => createVerityBuyerFeedback({
+    agentId: "9",
+    buyerWasHonest: true,
+    endpoint: "file:///buyer"
+  }), /ENDPOINT_INVALID/);
 });

@@ -22,6 +22,7 @@
     "register:provider": "tsx scripts/register-provider.ts",
     "register:erc8004": "tsx scripts/register-erc8004.ts",
     "register:agent": "tsx scripts/register-agent.ts",
+    "publish:agent0-feedback": "tsx scripts/publish-agent0-feedback.ts",
     "stake:provider": "tsx scripts/stake-provider.ts",
     "content:start": "npm --workspace @verity/content-service start",
     "disputes:start": "npm --workspace @verity/disputes start",
