@@ -160,7 +160,7 @@ export async function assertHtsSettlementToken(
   expectation: HtsSettlementTokenExpectation
 ): Promise<void> {
   parseTokenId(tokenId);
-  validateHtsSettlementTokenConfig({ ...expectation, tokenMemo: undefined });
+  validateHtsSettlementTokenConfig(expectation);
   const info = await new TokenInfoQuery().setTokenId(tokenId).execute(client);
   if (info.name !== expectation.tokenName
     || info.symbol !== expectation.tokenSymbol

@@ -168,8 +168,8 @@ function requiredEnvironment(name: string): string {
 }
 
 function createBondPoster(config: ReturnType<typeof readBuyerConfig>) {
-  if (process.env.HEDERA_ASSET_ID?.trim() !== "0.0.0") {
-    throw new Error("VERITY_ESCROW_ASSET_UNSUPPORTED: bond escrow currently accepts HBAR only; set HEDERA_ASSET_ID=0.0.0");
+  if (config.bondAssetId !== "0.0.0") {
+    throw new Error("VERITY_ESCROW_ASSET_UNSUPPORTED: bond escrow currently accepts HBAR only; set VERITY_BOND_ASSET_ID=0.0.0");
   }
   const contractId = requiredEnvironment("VERITY_ESCROW_CONTRACT_ID");
   const gas = Number(requiredEnvironment("VERITY_ESCROW_GAS"));

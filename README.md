@@ -97,6 +97,14 @@ npm run provision:topics
 
 No account ID, key, topic ID, price, or URL is embedded in the source. Values come from `.env` or the facilitator response.
 
+The settlement asset can remain native HBAR, or an operator can provision an HTS fungible token with an explicit treasury and same-token protocol fee:
+
+```sh
+npm run provision:token
+```
+
+Set the `HEDERA_TOKEN_*` fields first. The command writes the created token ID to `HEDERA_ASSET_ID`, validates the token metadata and fee schedule through the Hedera SDK, and associates every credential listed in `HEDERA_TOKEN_ASSOCIATIONS_JSON` before any optional initial transfer. The token settlement asset and the escrow bond asset are separate; `VERITY_BOND_ASSET_ID=0.0.0` keeps bonds in HBAR while a token is used for paid responses.
+
 ## Run the reference services
 
 Set `CONTENT_STORE_PUBLIC_URL` and `CONTENT_STORE_BASE_URL` to the reachable URL of the content process, then start it:
@@ -152,7 +160,7 @@ npm run register:agent
 
 `register:provider` forwards the complete IDKit result to `WORLD_ID_VERIFY_URL`, checks the proof signal against `VERITY_PROVIDER_IDENTITY_SIGNAL`, and writes the verified root to `VERITY_PROVIDER_ROOT`. Use the same `WORLD_ID_DISPUTE_ACTION` for provider registration and disputes so the root is comparable across both roles. The provider proof JSON and signal are local inputs and are never written to HCS.
 
-The script writes a provider record to `VERITY_PROVIDER_REGISTRY_FILE` containing `providerId`, the verified human root, the staked amount, and the provider EVM address. A provider record is not accepted by the dispute service unless all four values validate.
+The script publishes a compact `provider` record to the settlement HCS topic containing `providerId`, the verified human root, the staked amount, the provider EVM address, and the stake transaction ID. It also writes the same data to `VERITY_PROVIDER_REGISTRY_FILE` as an operator cache. The dispute service reads eligibility from Mirror Node and does not depend on that cache; a provider record is not accepted unless all four eligibility values validate.
 
 `register:agent` normalizes the ERC-8004 registry reference, anchors the provider's human root and public endpoint in the escrow contract's `AgentRegistered` event, and writes the Hedera transaction ID to `VERITY_PROVIDER_AGENT_REGISTRATION_TX`. The contract rejects a second registration for the same normalized agent reference.
 
@@ -188,7 +196,7 @@ No live contract address, topic ID, or replayable dispute ID is claimed in this 
 
 ## Hedera-specific rationale
 
-The resource server delivers before settlement, so the payment hold must survive evaluation inside a live HTTP request. Hedera's fast consensus and predictable low fees are important because the evaluator and checker quorum must finish before the signed transfer expires, while false-rejection adjudication must cost less than the trade. HCS provides an independently readable receipt stream, HTS is reserved for a future settlement-asset path, and Mirror Node is the read authority for reconciliation and replay. The mechanism is not merely an API wrapper: removing fast finality, low fixed fees, or the HCS audit stream weakens the economic and trust model.
+The resource server delivers before settlement, so the payment hold must survive evaluation inside a live HTTP request. Hedera's fast consensus and predictable low fees are important because the evaluator and checker quorum must finish before the signed transfer expires, while false-rejection adjudication must cost less than the trade. HCS provides an independently readable receipt stream, HTS can provide the settlement token and automatic protocol fee, and Mirror Node is the read authority for reconciliation and replay. The mechanism is not merely an API wrapper: removing fast finality, low fixed fees, or the HCS audit stream weakens the economic and trust model.
 
 ## Extra capability map
 
@@ -202,12 +210,12 @@ The resource server delivers before settlement, so the payment hold must survive
 | Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor implemented; public score indexing remains |
 | Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
 | Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88` and `packages/hcs/src/escrow.ts:42` | Expiring bonds and wait-for-expiry scheduling implemented; needs a live testnet run |
-| HTS custom fee settlement asset | — | Not implemented |
+| HTS custom fee settlement asset | `packages/hcs/src/token.ts:1` and `scripts/provision-token.ts:1` | Optional provisioning, association assertions, metadata checks, and same-token fee implemented; needs a live testnet run |
 | ERC-8004/HCS-14 registry | `packages/indexer/src/erc8004.ts:1` | Standard identity primitives implemented; live Hedera registry is not available in the current target deployment |
 
 ## Limitations
 
-Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. External provider adoption, live contract IDs, HCS IDs, and real dispute IDs are intentionally absent until they are produced by testnet runs rather than documentation.
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. The HTS token command is optional and requires associated accounts plus a live token transaction. External provider adoption, live contract IDs, HCS IDs, and real dispute IDs are intentionally absent until they are produced by testnet runs rather than documentation.
 
 ## Adoption
 

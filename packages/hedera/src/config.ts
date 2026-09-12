@@ -26,6 +26,7 @@ export interface BuyerConfig {
   readonly network: string;
   readonly clientAccountId: string;
   readonly clientPrivateKey: string;
+  readonly bondAssetId: string;
   readonly requestTimeoutMs: number;
 }
 
@@ -108,6 +109,7 @@ export function readBuyerConfig(env: NodeJS.ProcessEnv = process.env): BuyerConf
     network: required(env, "HEDERA_NETWORK"),
     clientAccountId: required(env, "HEDERA_CLIENT_ACCOUNT_ID"),
     clientPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
+    bondAssetId: env.VERITY_BOND_ASSET_ID?.trim() || "0.0.0",
     requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
   };
 }

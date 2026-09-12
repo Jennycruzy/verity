@@ -4,8 +4,8 @@ import { dirname } from "node:path";
 import { createHederaClient, createVerityEscrowClient, HederaHcsPublisher } from "@verity/hcs";
 
 const network = required("HEDERA_NETWORK");
-const assetId = required("HEDERA_ASSET_ID");
-if (assetId !== "0.0.0") throw new Error("VERITY_PROVIDER_ASSET_UNSUPPORTED: provider stake currently accepts HBAR only; set HEDERA_ASSET_ID=0.0.0");
+const bondAssetId = process.env.VERITY_BOND_ASSET_ID?.trim() || "0.0.0";
+if (bondAssetId !== "0.0.0") throw new Error("VERITY_PROVIDER_ASSET_UNSUPPORTED: provider stake currently accepts HBAR only; set VERITY_BOND_ASSET_ID=0.0.0");
 
 const providerId = required("VERITY_PROVIDER_ID");
 const providerRoot = required("VERITY_PROVIDER_ROOT");
