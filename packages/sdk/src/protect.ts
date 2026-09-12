@@ -8,14 +8,16 @@ export interface ProtectedRequest {
   readonly method: string;
   readonly url: string;
   readonly headers: IncomingMessage["headers"];
+  readonly raw?: IncomingMessage;
 }
 
 export type ProtectedApplication = (request: ProtectedRequest, response: ServerResponse) => void | Promise<void>;
 export type PriceResolver = string | ((request: ProtectedRequest) => string | Promise<string>);
+export type VerityVerifierId = RuleId | "graph-reputation-v1";
 
 export interface ProtectOptions {
   readonly price: PriceResolver;
-  readonly verifier: RuleId;
+  readonly verifier: VerityVerifierId;
   readonly stake?: string;
   readonly description?: string;
   readonly maxTimeoutSeconds?: number;
@@ -34,7 +36,8 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
     const protectedRequest: ProtectedRequest = {
       method: request.method ?? "GET",
       url: request.url ?? "/",
-      headers: request.headers
+      headers: request.headers,
+      raw: request
     };
     const capability = await capabilityPromise;
     const amount = await resolvePrice(options.price, protectedRequest);

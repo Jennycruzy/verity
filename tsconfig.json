@@ -11,6 +11,7 @@
     { "path": "./packages/indexer" },
     { "path": "./services/providers" },
     { "path": "./services/content" },
+    { "path": "./services/graph-gateway" },
     { "path": "./services/disputes" },
     { "path": "./services/settlement" },
     { "path": "./apps/explorer" }
