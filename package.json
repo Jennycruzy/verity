@@ -21,6 +21,7 @@
     "provision:token": "tsx scripts/provision-token.ts",
     "register:provider": "tsx scripts/register-provider.ts",
     "register:erc8004": "tsx scripts/register-erc8004.ts",
+    "register:graph-agent": "tsx scripts/register-graph-agent.ts",
     "register:agent": "tsx scripts/register-agent.ts",
     "publish:agent0-feedback": "tsx scripts/publish-agent0-feedback.ts",
     "stake:provider": "tsx scripts/stake-provider.ts",
