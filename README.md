@@ -89,6 +89,14 @@ npm run discover
 
 `npm run check:config` performs the same capability check, reports missing settings by use case, and reads public account balances from Mirror Node without printing secret values. It is the quickest way to see whether the next action is configuration or funding.
 
+If the provider account and payout account are blank, set an explicit starting balance and create both from the funded buyer account:
+
+```sh
+HEDERA_ACCOUNT_INITIAL_BALANCE_HBAR=1 npm run provision:accounts
+```
+
+The command creates two fresh ECDSA accounts, writes the provider credentials and payout account ID to the ignored `.env`, and prints only their public IDs, EVM addresses, and creation transaction IDs. It refuses to overwrite an existing provider or payout configuration. Run `npm run check:config` again afterward; fund only an account that the report identifies as below the required balance.
+
 The operator account needs testnet HBAR before running the following command. It creates or verifies both HCS topics and writes the IDs to `.env`:
 
 ```sh
