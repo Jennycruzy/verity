@@ -76,6 +76,7 @@ services:
     command: ["npm", "--workspace", "@verity/graph-gateway", "start"]
     environment:
       GRAPH_GATEWAY_PORT: "8092"
+      GRAPH_STUDIO_QUERY_URL: ${GRAPH_STUDIO_QUERY_URL}
 
   world-id:
     <<: *node
@@ -88,7 +89,8 @@ services:
     command: ["npm", "--workspace", "@verity/explorer", "start"]
     environment:
       EXPLORER_PORT: "8787"
-      GRAPH_SUBGRAPH_URL: http://graph-query:8092/query
+      GRAPH_SUBGRAPH_URL: ${GRAPH_STUDIO_QUERY_URL}
+      GRAPH_API_KEY: ${GRAPH_API_KEY}
 
 volumes:
   caddy_config:

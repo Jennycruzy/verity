@@ -13,7 +13,7 @@ export function readGraphGatewayConfig(env: NodeJS.ProcessEnv = process.env): Gr
     price: positiveAmount(env, "GRAPH_GATEWAY_PRICE"),
     maxBodyBytes: optionalPositiveInteger(env, "GRAPH_GATEWAY_MAX_BODY_BYTES", 65_536),
     requestTimeoutMs: optionalPositiveInteger(env, "GRAPH_GATEWAY_TIMEOUT_MS", 10_000),
-    subgraphUrl: httpUrl(env, "GRAPH_SUBGRAPH_URL"),
+    subgraphUrl: httpUrl(env, "GRAPH_STUDIO_QUERY_URL"),
     upstreamApiKey: required(env, "GRAPH_GATEWAY_UPSTREAM_API_KEY")
   };
 }

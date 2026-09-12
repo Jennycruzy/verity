@@ -5,7 +5,7 @@ import { readGraphGatewayConfig } from "../src/config.ts";
 const valid = {
   GRAPH_GATEWAY_PORT: "8092",
   GRAPH_GATEWAY_PRICE: "10",
-  GRAPH_SUBGRAPH_URL: "https://gateway.thegraph.com/api/subgraphs/id/example",
+  GRAPH_STUDIO_QUERY_URL: "https://gateway.thegraph.com/api/subgraphs/id/example",
   GRAPH_GATEWAY_UPSTREAM_API_KEY: "secret"
 };
 
@@ -21,5 +21,5 @@ test("reads a complete Graph gateway configuration", () => {
 });
 
 test("rejects an unsafe upstream URL", () => {
-  assert.throws(() => readGraphGatewayConfig({ ...valid, GRAPH_SUBGRAPH_URL: "file:///tmp/query" }), /GRAPH_SUBGRAPH_URL/);
+  assert.throws(() => readGraphGatewayConfig({ ...valid, GRAPH_STUDIO_QUERY_URL: "file:///tmp/query" }), /GRAPH_STUDIO_QUERY_URL/);
 });
