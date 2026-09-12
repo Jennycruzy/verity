@@ -184,6 +184,12 @@ npm run demo
 
 The buyer calls the provider, receives the response, evaluates it locally, and settles an accepted response through the settlement coordinator. A successful run prints the facilitator transaction ID and HCS transaction ID. Those IDs can be opened using the configured HashScan testnet base URL.
 
+Live honest-path evidence from 2026-09-12:
+
+- Request `1302814f-dcff-4653-8a64-4964cb0e975c` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08`.
+- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) transferred `0.01 HBAR` to the configured provider treasury.
+- [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) is readable from settlement topic `0.0.10501385`.
+
 For a rejected response, the buyer additionally needs a World ID proof, `VERITY_DISPUTE_URL`, a positive bond, one content reference per configured checker response, the escrow contract settings, and a running dispute service. The rejection path posts the bond before it sends the dispute request. There is no local identity substitute in the live path.
 
 `HEDERA_CLIENT_EVM_ADDRESS` may remain blank: the SDK derives the buyer address from `HEDERA_CLIENT_PRIVATE_KEY` and rejects a configured address that does not match that key.
@@ -213,6 +219,7 @@ Live Hedera Testnet records:
 | Settlement topic | `0.0.10501385` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501385) |
 | Dispute topic | `0.0.10501386` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501386) |
 | Bond escrow | `0.0.10502300` | [Contract](https://hashscan.io/testnet/contract/0.0.10502300) · [Creation transaction](https://hashscan.io/testnet/transaction/0.0.10472838@1789221045.369240725) |
+| Honest FX settlement | `1302814f-dcff-4653-8a64-4964cb0e975c` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) |
 | Signed-transfer measurement | 100 seconds settled; 101 seconds expired | [100-second settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789224054.629001290) · [run record](docs/HOLD-WINDOW.md) |
 
 A replayable dispute ID will be added only after a complete live rejection is recorded.
@@ -225,7 +232,7 @@ The resource server delivers before settlement, so the payment hold must survive
 
 | Capability | Evidence in this repository | Current status |
 | --- | --- | --- |
-| Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; local provider is live, paid testnet settlement remains to be recorded |
+| Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; honest FX request settled on testnet with linked evidence |
 | HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; settlement and dispute topics live on testnet |
 | Mirror Node replay | `packages/replay/src/index.ts:1` | Implemented and tested |
 | Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed on testnet; provider stake remains to be posted |
