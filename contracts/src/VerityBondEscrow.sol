@@ -14,6 +14,7 @@ contract VerityBondEscrow {
     error InvalidRoot();
     error NotOperator();
     error NotStakeOwner(bytes32 providerRoot);
+    error ProviderRootNotRegistered(bytes32 providerRoot);
     error Reentrancy();
     error InvalidResolutionRecipient();
     error StakeAlreadyLocked(bytes32 disputeId);
@@ -45,6 +46,7 @@ contract VerityBondEscrow {
     mapping(bytes32 => address) public stakeOwner;
     mapping(bytes32 => Reputation) public reputation;
     mapping(bytes32 => bool) public registeredAgents;
+    mapping(bytes32 => bool) public registeredHumanRoots;
     mapping(bytes32 => uint64) public buyerHonest;
     mapping(bytes32 => uint64) public buyerDishonest;
 
@@ -81,6 +83,7 @@ contract VerityBondEscrow {
         if (agentId == bytes32(0) || humanRoot == bytes32(0) || endpointHash == bytes32(0)) revert InvalidRoot();
         if (registeredAgents[agentId]) revert AgentAlreadyRegistered(agentId);
         registeredAgents[agentId] = true;
+        registeredHumanRoots[humanRoot] = true;
         emit AgentRegistered(agentId, humanRoot, endpointHash);
     }
 
@@ -114,6 +117,7 @@ contract VerityBondEscrow {
 
     function stakeProvider(bytes32 providerRoot) external payable {
         if (providerRoot == bytes32(0) || msg.value == 0) revert InvalidAmount();
+        if (!registeredHumanRoots[providerRoot]) revert ProviderRootNotRegistered(providerRoot);
         address owner = stakeOwner[providerRoot];
         if (owner == address(0)) {
             stakeOwner[providerRoot] = msg.sender;

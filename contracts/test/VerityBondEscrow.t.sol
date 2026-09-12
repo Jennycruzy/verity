@@ -45,6 +45,7 @@ contract VerityBondEscrowTest {
         provider = new Actor();
         vm.deal(address(buyer), 10 ether);
         vm.deal(address(provider), 10 ether);
+        escrow.registerAgent(keccak256("provider-agent"), PROVIDER_ROOT, keccak256("provider-endpoint"));
     }
 
     function testBondAndStakeResolveToBuyerWhenProviderWasWrong() public {
@@ -132,6 +133,13 @@ contract VerityBondEscrowTest {
             abi.encodeWithSelector(VerityBondEscrow.registerAgent.selector, agentId, PROVIDER_ROOT, endpointHash)
         );
         require(!success, "duplicate agent registration succeeded");
+    }
+
+    function testStakeRequiresARegisteredHumanRoot() public {
+        (bool success,) = address(provider).call{ value: 1 ether }(
+            abi.encodeWithSelector(Actor.stake.selector, payable(address(escrow)), keccak256("unregistered-provider"))
+        );
+        require(!success, "stake accepted an unregistered human root");
     }
 
     function testExpiredBondReturnsToBuyer() public {
