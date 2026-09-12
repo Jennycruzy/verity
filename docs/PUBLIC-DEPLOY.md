@@ -1,0 +1,111 @@
+# Public deployment
+
+The Hedera settlement proof can run from a laptop. A public URL is needed for the explorer, content-addressed replay, and independent provider adoption. Verity's compose deployment uses Caddy for HTTPS and keeps credentials in the server's ignored `.env` file.
+
+## 1. Prepare DNS and a small server
+
+Use any Linux VPS with Docker Engine and the Compose plugin. Point these hostnames at its public IPv4 address before starting Caddy:
+
+```text
+content.<domain>
+disputes.<domain>
+fx.<domain>
+bad-fx.<domain>
+checker.<domain>
+explorer.<domain>
+reputation.<domain>
+identity.<domain>
+```
+
+A wildcard DNS record is sufficient if the DNS provider supports it. Ports 80 and 443 must be reachable from the internet.
+
+## 2. Install and configure
+
+Run on the server:
+
+```sh
+git clone https://github.com/Jennycruzy/verity.git
+cd verity
+cp .env.example .env
+chmod 600 .env
+npm install
+```
+
+Set the deployment values in `.env` without committing the file:
+
+```dotenv
+VERITY_DOMAIN=<domain>
+CONTENT_STORE_BASE_URL=https://content.<domain>
+CONTENT_STORE_PUBLIC_URL=https://content.<domain>
+VERITY_DISPUTE_URL=https://disputes.<domain>/disputes
+VERITY_DISPUTE_HEALTH_URL=https://disputes.<domain>/health
+VERITY_DEMO_PROVIDER_URL=https://fx.<domain>/fx
+VERITY_DEMO_BAD_PROVIDER_URL=https://bad-fx.<domain>/fx
+VERITY_PROVIDER_PUBLIC_URL=https://fx.<domain>
+
+# Hosted Graph values copied from Graph Studio.
+GRAPH_STUDIO_QUERY_URL=<hosted-studio-query-url>
+GRAPH_GATEWAY_UPSTREAM_API_KEY=<hosted-graph-api-key>
+GRAPH_GATEWAY_PRICE=<positive-tinybar-amount>
+GRAPH_SUBGRAPH_URL=https://reputation.<domain>/query
+GRAPH_API_KEY=<explorer-query-key-if-required>
+
+# World values copied from the World Developer Portal.
+WORLD_ID_APP_ID=<app_id>
+WORLD_ID_RP_ID=<rp_id>
+WORLD_ID_SIGNING_KEY=<local-world-signing-key>
+WORLD_ID_VERIFY_URL=https://developer.world.org/api/v4/verify/<rp_id>
+WORLD_ID_DISPUTE_ACTION=<configured-world-action>
+```
+
+Copy the Hedera account credentials and the already-provisioned topic/contract values from the local `.env` only over a secure connection. Do not paste private keys into GitHub, Discord, or this repository. The Graph signer private keys are only needed by the local registration/feedback commands; they do not belong in the public image.
+
+## 3. Start and smoke-test
+
+```sh
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+```
+
+Check every public service before running a paid request:
+
+```sh
+for host in content disputes fx bad-fx checker explorer reputation identity; do
+  curl --fail --silent --show-error "https://${host}.<domain>/health"
+  echo
+done
+curl --include "https://fx.<domain>/fx"
+```
+
+The last request must return `402` and include a `payment-required` header. The service must not return a successful provider body before the x402 payment is verified.
+
+## 4. Run the real flows
+
+From a machine with the buyer `.env` configured:
+
+```sh
+npm run check:config
+npm run demo
+npm run dispute:demo
+```
+
+Use the public content URL when running replay on another machine:
+
+```sh
+CONTENT_STORE_BASE_URL=https://content.<domain> npx verity replay <dispute-id>
+```
+
+Replay should need only Mirror Node, the dispute topic ID, and the public content store. It must not need the VPS database or a Verity API key.
+
+## 5. Updating safely
+
+Keep `.env` on the server and out of Git. Pull a reviewed commit, rebuild, then inspect logs for terminal errors:
+
+```sh
+git pull --ff-only
+docker compose up -d --build
+docker compose logs --tail=100 disputes graph-query explorer
+```
+
+If Caddy cannot obtain a certificate, fix DNS or ports 80/443 first. Do not turn off TLS or replace a failed upstream with a local cache; a public URL that is not backed by the live service is not deployment evidence.

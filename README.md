@@ -116,7 +116,7 @@ Set the `HEDERA_TOKEN_*` fields first. The command writes the created token ID t
 
 ## Run the reference services
 
-For a public deployment, point the base domain and the eight service subdomains in `deploy/Caddyfile` at a server, set `VERITY_DOMAIN`, and run `docker compose up -d --build`. Caddy obtains TLS certificates automatically. The compose file runs the honest and degradable providers separately, includes the independent Go checker, persists content and dispute records in named volumes, and does not copy `.env` into an image. A small server is operational hosting, not a blockchain funding requirement.
+For a public deployment, point the base domain and the eight service subdomains in `deploy/Caddyfile` at a server, set `VERITY_DOMAIN`, and run `docker compose up -d --build`. Caddy obtains TLS certificates automatically. The compose file runs the honest and degradable providers separately, includes the independent Go checker, persists content and dispute records in named volumes, and does not copy `.env` into an image. A small server is operational hosting, not a blockchain funding requirement. See [docs/PUBLIC-DEPLOY.md](docs/PUBLIC-DEPLOY.md) for the secure copy-paste runbook.
 
 Set `CONTENT_STORE_PUBLIC_URL` and `CONTENT_STORE_BASE_URL` to the reachable URL of the content process, then start it:
 
