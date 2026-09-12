@@ -1,6 +1,5 @@
 import type { ProviderReputation } from "./client.js";
-
-export const VERITY_PROVIDER_FEEDBACK_TAG = "verity-provider" as const;
+import { VERITY_PROVIDER_FEEDBACK_TAG } from "./reputation-registry.js";
 
 interface Agent0Feedback {
   readonly value: unknown;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeAgent0Id, parseAgent0Provider, VERITY_PROVIDER_FEEDBACK_TAG } from "../src/agent0.ts";
+import { normalizeAgent0Id, parseAgent0Provider } from "../src/agent0.ts";
+import { VERITY_PROVIDER_FEEDBACK_TAG } from "../src/reputation-registry.ts";
 
 test("normalizes an Agent0 chain and agent identity", () => {
   assert.equal(normalizeAgent0Id("296:0007"), "296:7");
