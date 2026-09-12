@@ -24,6 +24,7 @@
     "stake:provider": "tsx scripts/stake-provider.ts",
     "content:start": "npm --workspace @verity/content-service start",
     "disputes:start": "npm --workspace @verity/disputes start",
+    "checker:go": "go -C services/checker-go run .",
     "contracts:build": "forge build --offline",
     "contracts:deploy": "tsx scripts/deploy-escrow.ts",
     "measure-hold": "tsx scripts/measure-hold-window.ts",
