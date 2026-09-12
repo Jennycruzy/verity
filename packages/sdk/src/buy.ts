@@ -66,9 +66,10 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
     import("@x402/core/client"),
     import("@x402/hedera")
   ]);
+  const clientPrivateKey = PrivateKey.fromStringECDSA(config.clientPrivateKey);
   const signer = createClientHederaSigner(
     config.clientAccountId,
-    PrivateKey.fromStringECDSA(config.clientPrivateKey),
+    clientPrivateKey,
     { network: config.network }
   );
   const client = new x402Client().setSpendControls(false).register(config.network as Network, new ExactHederaScheme(signer));
@@ -103,14 +104,18 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   if (!disputeUrl) {
     throw new Error("VERITY_DISPUTE_URL_MISSING: configure disputeUrl to submit a bonded rejection");
   }
+  assertHttpUrl(disputeUrl, "VERITY_DISPUTE_URL_INVALID");
 
   const providerId = requiredOption(options.providerId, "VERITY_PROVIDER_ID_MISSING: configure providerId for a bonded rejection");
   const buyerId = requiredOption(options.buyerId, "VERITY_BUYER_ID_MISSING: configure buyerId for a bonded rejection");
-  const buyerAddress = requiredOption(options.buyerAddress ?? process.env.HEDERA_CLIENT_EVM_ADDRESS, "VERITY_BUYER_ADDRESS_MISSING: configure the buyer EVM address for escrow resolution");
+  const buyerAddress = resolveBuyerAddress(options.buyerAddress ?? process.env.HEDERA_CLIENT_EVM_ADDRESS, normalizeEvmAddress(clientPrivateKey.publicKey.toEvmAddress()));
   const providerRoot = requiredOption(options.providerRoot, "VERITY_PROVIDER_ROOT_MISSING: configure providerRoot before posting a bond");
   const bondExpiry = resolveBondExpiry(options.bondExpiry);
   const identityProof = options.identityProof;
   if (!identityProof) throw new Error("VERITY_IDENTITY_PROOF_MISSING: provide a verified World ID proof before rejecting a response");
+  if (typeof identityProof !== "object" || Array.isArray(identityProof)) {
+    throw new Error("VERITY_IDENTITY_PROOF_INVALID: World ID proof must be a JSON object");
+  }
   const identitySignal = requiredOption(options.identitySignal, "VERITY_IDENTITY_SIGNAL_MISSING: provide the signal bound to the dispute");
   const providerResponses = options.providerResponses;
   if (!Array.isArray(providerResponses) || providerResponses.length < 3 || providerResponses.length % 2 === 0) {
@@ -201,6 +206,34 @@ function assertContentReference(value: unknown, name: string): asserts value is 
     || typeof candidate.byteLength !== "number" || !Number.isSafeInteger(candidate.byteLength) || candidate.byteLength < 0
     || (candidate.uri !== undefined && (typeof candidate.uri !== "string" || !candidate.uri.trim()))) {
     throw new Error(`VERITY_CONTENT_REFERENCE_INVALID: ${name} is not a valid content reference`);
+  }
+}
+
+function resolveBuyerAddress(configured: string | undefined, derived: string): string {
+  const candidate = configured?.trim() || derived;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(candidate)) {
+    throw new Error("VERITY_BUYER_ADDRESS_INVALID: buyer address must be a 20-byte EVM address");
+  }
+  if (configured && candidate.toLowerCase() !== derived.toLowerCase()) {
+    throw new Error("VERITY_BUYER_ADDRESS_MISMATCH: buyer address must match the configured ECDSA signing key");
+  }
+  return candidate;
+}
+
+function normalizeEvmAddress(value: string): string {
+  const normalized = value.startsWith("0x") ? value : `0x${value}`;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(normalized)) {
+    throw new Error("VERITY_BUYER_ADDRESS_INVALID: buyer key did not produce a 20-byte EVM address");
+  }
+  return normalized;
+}
+
+function assertHttpUrl(value: string, code: string): void {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("unsupported protocol");
+  } catch (error) {
+    throw new Error(`${code}: use an absolute HTTP(S) URL`, { cause: error });
   }
 }
 

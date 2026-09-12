@@ -19,7 +19,9 @@ test("posts a bond before submitting the deterministic dispute payload", async (
   process.env.BLOCKY402_URL = "https://facilitator.invalid";
   process.env.HEDERA_NETWORK = "hedera:testnet";
   process.env.HEDERA_CLIENT_ACCOUNT_ID = "0.0.2";
-  process.env.HEDERA_CLIENT_PRIVATE_KEY = PrivateKey.generateECDSA().toStringRaw();
+  const clientKey = PrivateKey.generateECDSA();
+  process.env.HEDERA_CLIENT_PRIVATE_KEY = clientKey.toStringRaw();
+  process.env.HEDERA_CLIENT_EVM_ADDRESS = "";
   const calls: string[] = [];
   const references = [reference("checker-a"), reference("checker-b"), reference("checker-c"), reference("checker-d"), reference("checker-e")];
   const bondExpiry = new Date(Date.now() + 120_000);
@@ -70,7 +72,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     disputeUrl: "https://dispute.invalid/disputes",
     providerId: "provider-1",
     buyerId: "buyer-1",
-    buyerAddress: `0x${"03".repeat(20)}`,
+    buyerAddress: `0x${clientKey.publicKey.toEvmAddress()}`,
     providerRoot: "provider-root",
     identityProof: { proof: "opaque" },
     identitySignal: "request-1",
@@ -100,6 +102,7 @@ test("rejects a facilitator success response that has no transaction ID", async 
   process.env.HEDERA_NETWORK = "hedera:testnet";
   process.env.HEDERA_CLIENT_ACCOUNT_ID = "0.0.2";
   process.env.HEDERA_CLIENT_PRIVATE_KEY = PrivateKey.generateECDSA().toStringRaw();
+  process.env.HEDERA_CLIENT_EVM_ADDRESS = "";
   const facilitator = new DiscoveryOnlyFacilitator("https://facilitator.invalid");
   const fetchImpl: typeof fetch = async (input, init) => {
     if (!init?.headers) {
@@ -129,6 +132,7 @@ test("rejects a malformed evaluator result before settlement", async () => {
   process.env.HEDERA_NETWORK = "hedera:testnet";
   process.env.HEDERA_CLIENT_ACCOUNT_ID = "0.0.2";
   process.env.HEDERA_CLIENT_PRIVATE_KEY = PrivateKey.generateECDSA().toStringRaw();
+  process.env.HEDERA_CLIENT_EVM_ADDRESS = "";
   const fetchImpl: typeof fetch = async (input, init) => {
     if (!init?.headers) {
       return new Response(JSON.stringify({
@@ -177,7 +181,6 @@ test("rejects malformed provider content before posting a bond", async () => {
       disputeUrl: "https://dispute.invalid/disputes",
       providerId: "provider-1",
       buyerId: "buyer-1",
-      buyerAddress: `0x${"03".repeat(20)}`,
       providerRoot: "provider-root",
       identityProof: { proof: "opaque" },
       identitySignal: "request-1",
