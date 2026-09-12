@@ -164,6 +164,7 @@ The deploy command writes the returned Hedera contract ID to `VERITY_ESCROW_CONT
 
 ```sh
 npm run register:provider
+npm run register:erc8004
 npm run register:agent
 npm run stake:provider
 ```
@@ -174,7 +175,9 @@ For the current World ID 4.x flow, create an app, RP, and action in the [World D
 
 The script publishes a compact `provider` record to the settlement HCS topic containing `providerId`, the verified human root, the staked amount, the provider EVM address, and the stake transaction ID. It also writes the same data to `VERITY_PROVIDER_REGISTRY_FILE` as an operator cache. The dispute service reads eligibility from Mirror Node and does not depend on that cache; it replays the recorded `stakeProvider` call and refuses a provider record unless the contract, caller, amount, root, and successful transaction all match.
 
-`register:agent` normalizes the ERC-8004 registry reference, anchors the provider's human root and public endpoint in the escrow contract's `AgentRegistered` event, and writes the Hedera transaction ID to `VERITY_PROVIDER_AGENT_REGISTRATION_TX`. The contract rejects a second registration for the same normalized agent reference.
+`register:erc8004` performs the real ERC-8004 Identity Registry transaction through the configured EVM JSON-RPC endpoint. It discovers the chain ID, requires registry bytecode and a non-zero signer balance, mints the agent ID, sets a self-contained standard registration URI, verifies owner and URI through the registry, and writes both transaction hashes to `.env`. It resumes safely if the mint succeeds but the URI update needs another run. Set `VERITY_ERC8004_AGENT_URI` to use an externally hosted registration file; otherwise the command uses a data URI and still records the standardized identity on-chain. The [official ERC-8004 deployment list](https://github.com/erc-8004/erc-8004-contracts#contract-addresses) includes a Hedera Testnet Identity Registry; copy the current address into `VERITY_ERC8004_REGISTRY` rather than hardcoding it in the application.
+
+`register:agent` normalizes that ERC-8004 registry reference, anchors the provider's human root and public endpoint in the escrow contract's `AgentRegistered` event, and writes the Hedera transaction ID to `VERITY_PROVIDER_AGENT_REGISTRATION_TX`. The contract rejects a second registration for the same normalized agent reference.
 
 To protect a bonded rejection from a process crash after the bond is posted, set `VERITY_BOND_EXPIRY_SECONDS` to a positive duration. The buyer then calls `postBondWithExpiry` and creates a Hedera Scheduled Transaction for `releaseExpiredBond`; the returned schedule ID is carried through the dispute request and HCS receipts. Leave it blank for the ordinary dispute path. A scheduled release only returns an unresolved bond after its expiry, so it cannot override a completed adjudication.
 
@@ -250,11 +253,11 @@ The resource server delivers before settlement, so the payment hold must survive
 | Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
 | Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88`, `packages/hcs/src/escrow.ts:42`, and `packages/sdk/src/buy.ts:1` | Expiring bonds, wait-for-expiry scheduling, and SDK wiring implemented; needs a live testnet run |
 | HTS custom fee settlement asset | `packages/hcs/src/token.ts:1` and `scripts/provision-token.ts:1` | Optional provisioning, association assertions, metadata checks, and same-token fee implemented; needs a live testnet run |
-| ERC-8004/HCS-14 registry | `packages/indexer/src/erc8004.ts:1` | Standard identity primitives implemented; live Hedera registry is not available in the current target deployment |
+| ERC-8004/HCS-14 registry | `packages/indexer/src/identity-registry.ts:1` and `scripts/register-erc8004.ts:1` | Live EVM registration, URI verification, and resumable transaction recording implemented; requires operator RPC/config and one real registry transaction |
 
 ## Limitations
 
-Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption and a real replayable dispute remain outstanding.
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. ERC-8004 registration is wired to the published EVM registry interface but still requires an operator-supplied RPC URL, registry reference, provider signer balance, and live registration transaction. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption and a real replayable dispute remain outstanding.
 
 ## Adoption
 

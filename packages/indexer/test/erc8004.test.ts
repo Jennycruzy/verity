@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createErc8004Registration, erc8004AgentKey, normalizeErc8004AgentId, normalizeErc8004Registry } from "../src/erc8004.ts";
+import { createErc8004AgentDataUri, parseErc8004AgentDataUri, parseErc8004EvmRegistry } from "../src/identity-registry.ts";
 
 test("canonicalizes an ERC-8004 registry and token identity", () => {
   const reference = { agentRegistry: "EIP155:001:0xABC", agentId: "00022" };
@@ -36,4 +37,31 @@ test("rejects an incomplete standard identity", () => {
     active: true,
     registrations: []
   }), /VERITY_ERC8004_SERVICES/);
+});
+
+test("parses a live EVM registry reference without changing its chain", () => {
+  const parsed = parseErc8004EvmRegistry("EIP155:296:0x8004A818BFB912233c491871b3d84c89A494BD9e");
+  assert.deepEqual(parsed, {
+    reference: "eip155:296:0x8004a818bfb912233c491871b3d84c89a494bd9e",
+    chainId: "296",
+    address: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
+  });
+  assert.throws(() => parseErc8004EvmRegistry("eip155:296:0xregistry"), /VERITY_ERC8004_REGISTRY_INVALID/);
+});
+
+test("creates a self-contained registration URI bound to its agent identity", () => {
+  const registry = "eip155:296:0x8004a818bfb912233c491871b3d84c89a494bd9e";
+  const uri = createErc8004AgentDataUri({
+    name: "Verity FX",
+    description: "Deterministic FX responses",
+    publicUrl: "https://provider.example/api/",
+    registry,
+    agentId: "7",
+    kind: "fx"
+  });
+  const registration = parseErc8004AgentDataUri(uri);
+  assert.equal(registration.registrations[0]?.agentRegistry, registry);
+  assert.equal(registration.registrations[0]?.agentId, "7");
+  assert.equal(registration.services[0]?.endpoint, "https://provider.example/api/fx");
+  assert.throws(() => parseErc8004AgentDataUri("data:application/json;base64,not-json"), /VERITY_ERC8004_URI_INVALID/);
 });

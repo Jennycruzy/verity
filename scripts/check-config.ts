@@ -71,6 +71,7 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     required("VERITY_PROVIDER_PUBLIC_URL", "provider", "public provider URL for identity registration"),
     required("VERITY_ERC8004_REGISTRY", "provider", "normalized ERC-8004 registry reference"),
     required("VERITY_ERC8004_AGENT_ID", "provider", "ERC-8004 agent ID"),
+    required("VERITY_ERC8004_RPC_URL", "provider", "EVM JSON-RPC URL for ERC-8004 registration"),
     required("WORLD_ID_VERIFY_URL", "dispute", "World ID verification endpoint"),
     required("WORLD_ID_DISPUTE_ACTION", "dispute", "World ID dispute action")
   ];
