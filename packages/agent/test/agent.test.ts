@@ -140,6 +140,29 @@ test("World ID verifier reads a nested uniqueness result and refuses session-onl
   );
 });
 
+test("World ID verifier accepts the current IDKit response shape", async () => {
+  const signal = "dispute-current-shape";
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/api/v4/verify/rp_test", action: "dispute" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({
+      success: true,
+      action: "dispute",
+      results: [{ success: true, nullifier: "0x2c" }]
+    }), { status: 200 })
+  );
+  const proof = {
+    protocol_version: "3.0",
+    action: "dispute",
+    responses: [{ signal_hash: hashWorldSignal(signal), proof: "0xproof" }]
+  };
+
+  const verified = await verifier.verify(proof, signal);
+
+  assert.equal(verified.root, "44");
+  assert.equal(verified.action, "dispute");
+});
+
 test("World ID verifier rejects a proof bound to another signal", async () => {
   const verifier = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
