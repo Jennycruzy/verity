@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { signRequest } from "@worldcoin/idkit-core/signing";
 import type { WorldIdServiceConfig } from "./config.js";
+import { WORLD_ID_PROOF_PAGE } from "./page.js";
 
 export function createWorldIdServer(config: WorldIdServiceConfig, fetchImpl: typeof fetch = fetch) {
   return createServer((request, response) => {
@@ -17,6 +18,13 @@ export async function handleWorldIdRequest(
   fetchImpl: typeof fetch = fetch
 ): Promise<void> {
   const path = request.url?.split("?", 1)[0] ?? "/";
+  if (request.method === "GET" && path === "/") {
+    response.statusCode = 200;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.setHeader("cache-control", "no-store");
+    response.end(WORLD_ID_PROOF_PAGE);
+    return;
+  }
   if (request.method === "GET" && path === "/health") {
     writeJson(response, 200, { status: "ok", source: "world-id" });
     return;
@@ -37,7 +45,8 @@ export async function handleWorldIdRequest(
       sig: signature.sig,
       nonce: signature.nonce,
       created_at: signature.createdAt,
-      expires_at: signature.expiresAt
+      expires_at: signature.expiresAt,
+      environment: config.environment
     });
     return;
   }

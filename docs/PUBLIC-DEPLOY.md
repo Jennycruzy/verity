@@ -57,6 +57,7 @@ WORLD_ID_RP_ID=<rp_id>
 WORLD_ID_SIGNING_KEY=<local-world-signing-key>
 WORLD_ID_VERIFY_URL=https://developer.world.org/api/v4/verify/<rp_id>
 WORLD_ID_DISPUTE_ACTION=<configured-world-action>
+WORLD_ID_ENVIRONMENT=production
 ```
 
 Copy the Hedera account credentials and the already-provisioned topic/contract values from the local `.env` only over a secure connection. Do not paste private keys into GitHub, Discord, or this repository. The Graph signer private keys are only needed by the local registration/feedback commands; they do not belong in the public image.
@@ -80,6 +81,8 @@ for host in content disputes fx fx-secondary bad-fx checker explorer reputation 
 done
 curl --include "https://fx.<domain>/fx"
 ```
+
+Open `https://identity.<domain>/` to obtain a Proof of Human. Select the configured action, enter the exact signal that the Verity command will submit, approve the request in World App or the simulator, and copy the complete proof JSON from the page. The page verifies the proof with the configured Developer Portal endpoint before showing it. Use `WORLD_ID_ENVIRONMENT=staging` with a staging app and simulator, or `production` with a production app and World App.
 
 From the buyer checkout on a machine with the deployment domain in `.env`, the same check is reproducible with:
 

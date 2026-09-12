@@ -5,11 +5,16 @@ export interface WorldIdServiceConfig {
   readonly signingKeyHex: string;
   readonly verifyUrl: string;
   readonly allowedActions: readonly string[];
+  readonly environment: "production" | "staging" | "sandbox";
 }
 
 export function readWorldIdServiceConfig(env: NodeJS.ProcessEnv = process.env): WorldIdServiceConfig {
   const allowedActions = required(env, "WORLD_ID_ALLOWED_ACTIONS").split(",").map((value) => value.trim()).filter(Boolean);
   if (allowedActions.length === 0) throw new Error("VERITY_WORLD_CONFIG_INVALID: WORLD_ID_ALLOWED_ACTIONS must contain an action");
+  const environment = env.WORLD_ID_ENVIRONMENT?.trim() || "production";
+  if (environment !== "production" && environment !== "staging" && environment !== "sandbox") {
+    throw new Error("VERITY_WORLD_CONFIG_INVALID: WORLD_ID_ENVIRONMENT must be production, staging, or sandbox");
+  }
   const signingKeyHex = required(env, "WORLD_ID_SIGNING_KEY");
   if (!/^0x[0-9a-fA-F]{64}$/.test(signingKeyHex)) throw new Error("VERITY_WORLD_CONFIG_INVALID: WORLD_ID_SIGNING_KEY must be a 32-byte 0x-prefixed hex key");
   const appId = required(env, "WORLD_ID_APP_ID");
@@ -22,7 +27,8 @@ export function readWorldIdServiceConfig(env: NodeJS.ProcessEnv = process.env): 
     rpId,
     signingKeyHex,
     verifyUrl,
-    allowedActions
+    allowedActions,
+    environment
   };
 }
 

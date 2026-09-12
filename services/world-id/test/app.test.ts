@@ -10,7 +10,8 @@ const config: WorldIdServiceConfig = {
   rpId: "rp_test",
   signingKeyHex: `0x${"11".repeat(32)}`,
   verifyUrl: "https://developer.world.org/api/v4/verify/rp_test",
-  allowedActions: ["verity-provider-registration", "verity-dispute"]
+  allowedActions: ["verity-provider-registration", "verity-dispute"],
+  environment: "staging"
 };
 
 test("issues an RP signature only for an allowed action", async () => {
@@ -21,6 +22,7 @@ test("issues an RP signature only for an allowed action", async () => {
   assert.equal(body.app_id, "app_test");
   assert.equal(body.rp_id, "rp_test");
   assert.equal(body.action, "verity-dispute");
+  assert.equal(body.environment, "staging");
   assert.match(String(body.sig), /^0x/);
   assert.match(String(body.nonce), /^0x/);
 });
@@ -46,9 +48,17 @@ test("rejects an action outside the configured allow-list", async () => {
   );
 });
 
-function requestForTest(path: string, body: string): Readable & { method: string; url: string; headers: Record<string, string> } {
-  const request = Readable.from([Buffer.from(body)]) as Readable & { method: string; url: string; headers: Record<string, string> };
-  request.method = "POST";
+test("serves an operator proof page without exposing the signing key", async () => {
+  const result = responseForTest();
+  await handleWorldIdRequest(requestForTest("/", "", "GET"), result.response, config);
+  assert.equal(result.status(), 200);
+  assert.match(result.body(), /IDKit\.proofOfHuman/);
+  assert.doesNotMatch(result.body(), /1111111111111111111111111111111111111111111111111111111111111111/);
+});
+
+function requestForTest(path: string, body: string, method = "POST"): Readable & { method: string; url: string; headers: Record<string, string> } {
+  const request = Readable.from(body ? [Buffer.from(body)] : []) as Readable & { method: string; url: string; headers: Record<string, string> };
+  request.method = method;
   request.url = path;
   request.headers = { "content-type": "application/json" };
   return request;
