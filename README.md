@@ -174,7 +174,7 @@ Set `GRAPH_GATEWAY_PRICE`, `GRAPH_GATEWAY_UPSTREAM_API_KEY`, and `GRAPH_STUDIO_Q
 
 For a public content service, set `CONTENT_STORE_WRITE_TOKEN`. Replay reads remain public by hash, while buyer uploads require `Authorization: Bearer <token>`; the SDK reads the token from the ignored environment file.
 
-The routing proof uses that paid transport directly. Set `GRAPH_MIN_RELIABILITY`, `GRAPH_ROUTE_CANDIDATES_JSON`, and the two Agent0 query files, then run `npm run graph:route`. It prints the selected endpoint and queried score. Changing the indexed score changes the selected provider; deleting the Subgraph or removing the x402 resource causes the command to fail instead of silently using a local cache.
+The routing proof uses that paid transport directly. Set `GRAPH_MIN_RELIABILITY`, `GRAPH_ROUTE_CANDIDATES_JSON`, and the two Agent0 query files, then run `npm run graph:route`. It prints the selected endpoint and queried score. Changing the indexed score changes the selected provider; deleting the Subgraph or removing the x402 resource causes the command to fail instead of silently using a local cache. Set `GRAPH_ROUTE_BUYER_ROOT` after the buyer has a published Agent0 history to make the same route decision query buyer honesty and refuse a root below `GRAPH_MIN_HONESTY`; the buyer key is the World nullifier root, never a wallet address.
 
 With the same Graph configuration, start the public explorer with `npm --workspace @verity/explorer start`. Open `http://127.0.0.1:8787/` to query provider reliability or buyer honesty. The browser page and JSON routes both call `GraphReputationClient`; there is no parallel local reputation database.
 
@@ -230,6 +230,10 @@ The buyer calls the provider, receives the response, evaluates it locally, and s
 
 Live honest-path evidence from 2026-09-12:
 
+- Request `0721bd9e-332c-416f-8cde-4d091164e8a6` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08` after the deployment hardening changes.
+- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789252458.310034075) transferred the configured amount to the provider treasury.
+- [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789252461.678940522) is readable from settlement topic `0.0.10501385`.
+
 - Request `a7353260-8829-445e-ad23-d6f23baa3bae` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08`.
 - [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789245767.729586729) transferred the configured amount to the provider treasury.
 - [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789245772.571672131) is readable from settlement topic `0.0.10501385`.
@@ -273,6 +277,7 @@ Live Hedera Testnet records:
 | Bond escrow | `0.0.10502300` | [Contract](https://hashscan.io/testnet/contract/0.0.10502300) · [Creation transaction](https://hashscan.io/testnet/transaction/0.0.10472838@1789221045.369240725) |
 | Honest FX settlement | `1302814f-dcff-4653-8a64-4964cb0e975c` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) |
 | Latest honest FX settlement | `a7353260-8829-445e-ad23-d6f23baa3bae` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789245767.729586729) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789245772.571672131) |
+| Post-hardening honest FX settlement | `0721bd9e-332c-416f-8cde-4d091164e8a6` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789252458.310034075) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789252461.678940522) |
 | Signed-transfer measurement | 100 seconds settled; 101 seconds expired | [100-second settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789224054.629001290) · [run record](docs/HOLD-WINDOW.md) |
 
 A replayable dispute ID will be added only after a complete live rejection is recorded.

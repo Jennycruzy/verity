@@ -21,14 +21,16 @@ const reputation = new GraphReputationClient(
   undefined,
   transport
 );
-const router = new ReputationRouter(reputation, readThreshold());
-const selected = await router.choose(readCandidates(required("GRAPH_ROUTE_CANDIDATES_JSON")));
+const router = new ReputationRouter(reputation, readThreshold(), readHonestyThreshold());
+const buyerRoot = process.env.GRAPH_ROUTE_BUYER_ROOT?.trim();
+const selected = await router.choose(readCandidates(required("GRAPH_ROUTE_CANDIDATES_JSON")), buyerRoot ? { buyerRoot } : {});
 console.log(JSON.stringify({
   source: "paid-graph-reputation",
   selected: selected.agentId,
   endpoint: selected.endpoint,
   reliabilityScore: selected.reputation.reliabilityScore,
-  completedRequests: selected.reputation.completedRequests
+  completedRequests: selected.reputation.completedRequests,
+  ...(selected.buyerReputation ? { buyerHonestyScore: selected.buyerReputation.honestyScore, buyerDisputes: selected.buyerReputation.disputes } : {})
 }, null, 2));
 
 async function readQuery(path: string): Promise<ReputationQuery> {
@@ -81,6 +83,12 @@ function readCandidates(raw: string): readonly ProviderCandidate[] {
 function readThreshold(): number {
   const value = Number(required("GRAPH_MIN_RELIABILITY"));
   if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error("VERITY_GRAPH_MIN_RELIABILITY: set a number between 0 and 1");
+  return value;
+}
+
+function readHonestyThreshold(): number {
+  const value = Number(process.env.GRAPH_MIN_HONESTY?.trim() || "0.8");
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error("VERITY_GRAPH_MIN_HONESTY: set a number between 0 and 1");
   return value;
 }
 

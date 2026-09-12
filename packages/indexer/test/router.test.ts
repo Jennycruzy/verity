@@ -30,3 +30,36 @@ test("routing breaks equal scores with stable byte ordering", async () => {
   ]);
   assert.equal(selected.agentId, "provider-a");
 });
+
+test("routing queries buyer honesty and refuses a low-standing root", async () => {
+  const queriedRoots: string[] = [];
+  const router = new ReputationRouter(
+    {
+      provider: async (agentId) => ({ agentId, endpoint: "https://provider.invalid", reliabilityScore: 0.95, completedRequests: 4 }),
+      buyer: async (root) => {
+        queriedRoots.push(root);
+        return { root, honestyScore: 0.2, disputes: 3 };
+      }
+    },
+    0.8,
+    0.8
+  );
+  await assert.rejects(
+    router.choose([{ agentId: "provider", endpoint: "https://provider.invalid" }], { buyerRoot: "human-root-1" }),
+    /VERITY_ROUTER_BUYER_INELIGIBLE/
+  );
+  assert.deepEqual(queriedRoots, ["human-root-1"]);
+});
+
+test("routing returns the queried buyer record with a selected provider", async () => {
+  const router = new ReputationRouter(
+    {
+      provider: async (agentId) => ({ agentId, endpoint: "https://provider.invalid", reliabilityScore: 0.95, completedRequests: 4 }),
+      buyer: async (root) => ({ root, honestyScore: 0.99, disputes: 1 })
+    },
+    0.8,
+    0.8
+  );
+  const selected = await router.choose([{ agentId: "provider", endpoint: "https://provider.invalid" }], { buyerRoot: "human-root-1" });
+  assert.equal(selected.buyerReputation?.honestyScore, 0.99);
+});
