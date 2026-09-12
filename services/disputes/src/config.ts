@@ -37,14 +37,14 @@ export function readDisputeServiceConfig(env: NodeJS.ProcessEnv = process.env): 
     maxBodyBytes: positiveInteger(env, "DISPUTE_MAX_BODY_BYTES"),
     checkerTimeoutMs: positiveInteger(env, "DISPUTE_CHECKER_TIMEOUT_MS"),
     checkers,
-    contentStoreBaseUrl: required(env, "CONTENT_STORE_BASE_URL"),
+    contentStoreBaseUrl: requiredHttpUrl(env, "CONTENT_STORE_BASE_URL"),
     rootStorePath: required(env, "VERITY_ROOT_STORE_PATH"),
-    providerTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
+    providerTopicId: requiredHederaId(env, "HCS_SETTLEMENT_TOPIC_ID"),
     disputeStoreDirectory: required(env, "DISPUTE_STORE_DIR"),
-    worldVerifyUrl: required(env, "WORLD_ID_VERIFY_URL"),
+    worldVerifyUrl: requiredHttpUrl(env, "WORLD_ID_VERIFY_URL"),
     worldAction: required(env, "WORLD_ID_DISPUTE_ACTION"),
-    mirrorNodeBaseUrl: required(env, "MIRROR_NODE_BASE_URL"),
-    escrowContractId: required(env, "VERITY_ESCROW_CONTRACT_ID")
+    mirrorNodeBaseUrl: requiredHttpUrl(env, "MIRROR_NODE_BASE_URL"),
+    escrowContractId: requiredHederaId(env, "VERITY_ESCROW_CONTRACT_ID")
   };
 }
 
@@ -64,10 +64,30 @@ function readCheckers(raw: string): readonly CheckerConfig[] {
     if (typeof candidate.id !== "string" || !candidate.id.trim() || typeof candidate.url !== "string" || !candidate.url.trim()) {
       throw new Error(`VERITY_DISPUTE_CHECKERS_CONFIG: checker ${index} requires id and url`);
     }
-    return { id: candidate.id.trim(), url: candidate.url.trim() };
+    const url = candidate.url.trim();
+    if (!isHttpUrl(url)) throw new Error(`VERITY_DISPUTE_CHECKERS_CONFIG: checker ${index} URL must be an absolute HTTP(S) URL`);
+    return { id: candidate.id.trim(), url };
   });
   if (new Set(checkers.map((checker) => checker.id)).size !== checkers.length) {
     throw new Error("VERITY_DISPUTE_CHECKERS_CONFIG: checker IDs must be unique");
   }
   return checkers;
+}
+
+function requiredHederaId(env: NodeJS.ProcessEnv, name: string): string {
+  const value = required(env, name);
+  if (!/^0\.0\.\d+$/.test(value)) throw new Error(`VERITY_DISPUTE_CONFIG_INVALID: ${name} must use Hedera 0.0.N format`);
+  return value;
+}
+
+function requiredHttpUrl(env: NodeJS.ProcessEnv, name: string): string {
+  const value = required(env, name);
+  if (!isHttpUrl(value)) throw new Error(`VERITY_DISPUTE_CONFIG_INVALID: ${name} must be an absolute HTTP(S) URL`);
+  return value;
+}
+
+function isHttpUrl(value: string): boolean {
+  if (!URL.canParse(value)) return false;
+  const url = new URL(value);
+  return url.protocol === "http:" || url.protocol === "https:";
 }

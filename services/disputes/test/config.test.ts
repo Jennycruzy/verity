@@ -35,3 +35,25 @@ test("loads checker and dispute service configuration", () => {
 test("rejects an even checker set", () => {
   assert.throws(() => readDisputeServiceConfig({ ...baseEnv, DISPUTE_CHECKERS_JSON: JSON.stringify([{ id: "a", url: "https://a.invalid" }, { id: "b", url: "https://b.invalid" }]) }), /VERITY_DISPUTE_CHECKERS_CONFIG/);
 });
+
+test("rejects malformed Hedera identifiers", () => {
+  assert.throws(
+    () => readDisputeServiceConfig({ ...baseEnv, HCS_SETTLEMENT_TOPIC_ID: "settlement-topic" }),
+    /VERITY_DISPUTE_CONFIG_INVALID: HCS_SETTLEMENT_TOPIC_ID/
+  );
+  assert.throws(
+    () => readDisputeServiceConfig({ ...baseEnv, VERITY_ESCROW_CONTRACT_ID: "escrow-contract" }),
+    /VERITY_DISPUTE_CONFIG_INVALID: VERITY_ESCROW_CONTRACT_ID/
+  );
+});
+
+test("requires absolute HTTP URLs for dispute dependencies", () => {
+  assert.throws(
+    () => readDisputeServiceConfig({ ...baseEnv, WORLD_ID_VERIFY_URL: "world-verify" }),
+    /VERITY_DISPUTE_CONFIG_INVALID: WORLD_ID_VERIFY_URL/
+  );
+  assert.throws(
+    () => readDisputeServiceConfig({ ...baseEnv, DISPUTE_CHECKERS_JSON: JSON.stringify([{ id: "a", url: "file:///checker" }, { id: "b", url: "https://b.invalid" }, { id: "c", url: "https://c.invalid" }]) }),
+    /checker 0 URL must be an absolute HTTP\(S\) URL/
+  );
+});
