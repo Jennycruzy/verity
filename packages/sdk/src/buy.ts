@@ -94,7 +94,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   }
 
   if (!options.bond) {
-    throw new Error("VERITY_NO_BOND: reject() requires a bond; call buy() with { bond } or see docs/bonds");
+    throw new Error("VERITY_NO_BOND: reject() requires a bond; call buy() with { bond } or see docs/BONDS.md");
   }
   if (!/^\d+$/.test(options.bond) || BigInt(options.bond) <= 0n) {
     throw new Error("VERITY_BOND_INVALID: bond must be a positive integer in the configured asset's smallest unit");
