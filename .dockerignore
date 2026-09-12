@@ -1,0 +1,8 @@
+.env
+.git
+**/node_modules
+**/dist
+artifacts
+graph/subgraph/build
+graph/substreams/build
+npm-debug.log

@@ -1,0 +1,27 @@
+content.{$VERITY_DOMAIN} {
+  reverse_proxy content:8090
+}
+
+disputes.{$VERITY_DOMAIN} {
+  reverse_proxy disputes:8091
+}
+
+fx.{$VERITY_DOMAIN} {
+  reverse_proxy fx:8080
+}
+
+bad-fx.{$VERITY_DOMAIN} {
+  reverse_proxy bad-fx:8080
+}
+
+checker.{$VERITY_DOMAIN} {
+  reverse_proxy checker:3201
+}
+
+explorer.{$VERITY_DOMAIN} {
+  reverse_proxy explorer:8787
+}
+
+reputation.{$VERITY_DOMAIN} {
+  reverse_proxy graph-query:8092
+}

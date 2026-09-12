@@ -1,0 +1,91 @@
+name: verity
+
+x-node: &node
+  build:
+    context: .
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  content:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/content-service", "start"]
+    environment:
+      CONTENT_STORE_PORT: "8090"
+      CONTENT_STORE_DIR: /data/content
+      CONTENT_STORE_PUBLIC_URL: https://content.${VERITY_DOMAIN}
+    volumes:
+      - content_data:/data/content
+
+  fx:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/providers", "start"]
+    environment:
+      PORT: "8080"
+      PROVIDER_KIND: fx
+      DEGRADE_MODE: "false"
+      VERITY_PROVIDER_PUBLIC_URL: https://fx.${VERITY_DOMAIN}
+
+  bad-fx:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/providers", "start"]
+    environment:
+      PORT: "8080"
+      PROVIDER_KIND: fx
+      DEGRADE_MODE: "true"
+      VERITY_PROVIDER_PUBLIC_URL: https://bad-fx.${VERITY_DOMAIN}
+
+  checker:
+    build:
+      context: services/checker-go
+    env_file: .env
+    restart: unless-stopped
+    environment:
+      CHECKER_PORT: "3201"
+
+  disputes:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/disputes", "start"]
+    depends_on:
+      - content
+      - fx
+      - checker
+    environment:
+      DISPUTE_PORT: "8091"
+      DISPUTE_STORE_DIR: /data/disputes
+      CONTENT_STORE_BASE_URL: http://content:8090
+      DISPUTE_CHECKERS_JSON: '[{"id":"fx-node","url":"http://fx:8080/check"},{"id":"fx-bad-node","url":"http://bad-fx:8080/check"},{"id":"fx-independent-go","url":"http://checker:3201/check"}]'
+    volumes:
+      - dispute_data:/data/disputes
+
+  graph-query:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/graph-gateway", "start"]
+    environment:
+      GRAPH_GATEWAY_PORT: "8092"
+
+  explorer:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/explorer", "start"]
+    environment:
+      EXPLORER_PORT: "8787"
+      GRAPH_SUBGRAPH_URL: http://graph-query:8092/query
+
+volumes:
+  caddy_config:
+  caddy_data:
+  content_data:
+  dispute_data:
