@@ -170,8 +170,8 @@ function nextActions(
   accounts: readonly AccountStatus[]
 ): readonly string[] {
   const actions = checks
-    .filter((check) => check.state === "missing" && check.scope === "first-payment")
-    .map((check) => `set ${check.key} (${check.detail})`);
+    .filter((check) => check.state === "missing" || check.state === "invalid")
+    .map((check) => `${check.state === "invalid" ? "fix" : "set"} ${check.key} (${check.detail})`);
   if (facilitator.state !== "ready") actions.push("run npm run discover after the facilitator URL and network are set");
   const buyer = accounts.find((account) => account.accountId === process.env.HEDERA_CLIENT_ACCOUNT_ID?.trim());
   if (buyer?.state === "ready" && (buyer.tinybar ?? 0) > 0 && !process.env.HEDERA_CLIENT_PRIVATE_KEY?.trim()) {
