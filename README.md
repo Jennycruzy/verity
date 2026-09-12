@@ -142,7 +142,7 @@ When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC800
 
 The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live Graph endpoint and query files configured, `npm run graph:mcp` exposes provider reliability and buyer honesty as MCP tools. The Graph transport requires an x402 challenge and settles the query before returning data.
 
-The Graph data path is implemented as an address-filtered Substreams package feeding an Agent0-compatible Subgraph. Configure the Base Sepolia RPC and current ERC-8004 identity and reputation registries, then build both artifacts:
+The Graph data path is implemented as an address-filtered Substreams package feeding an Agent0-compatible Subgraph. Provider reputation is keyed by the standard Agent ID; buyer reputation is looked up by the World ID nullifier root through the small `Agent.humanRoot` extension, populated from the signed feedback evidence. This preserves a portable ERC-8004 Agent/Feedback model without pretending a wallet address is a human identity. Configure the Base Sepolia RPC and current ERC-8004 identity and reputation registries, then build both artifacts:
 
 ```sh
 npm run graph:build
