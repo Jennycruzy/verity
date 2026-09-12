@@ -1,0 +1,78 @@
+specVersion: 1.0.0
+description: Verity reputation records indexed through Agent0-compatible ERC-8004 entities.
+repository: https://github.com/Jennycruzy/verity
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  - kind: substreams
+    name: agent0Identity
+    network: base-sepolia
+    context:
+      chainId:
+        type: BigInt
+        data: "${GRAPH_AGENT0_CHAIN_ID}"
+      registryAddress:
+        type: Bytes
+        data: "${GRAPH_FEEDBACK_IDENTITY_REGISTRY}"
+      registryKind:
+        type: String
+        data: identity
+    source:
+      package:
+        moduleName: identity_events
+        file: ../substreams/verity-agent-feedback-v0.1.0.spkg
+    mapping:
+      apiVersion: 0.0.7
+      kind: substreams/graph-entities
+      file: ./src/mapping.ts
+      handler: handleEvents
+
+  - kind: substreams
+    name: agent0Feedback
+    network: base-sepolia
+    context:
+      chainId:
+        type: BigInt
+        data: "${GRAPH_AGENT0_CHAIN_ID}"
+      registryAddress:
+        type: Bytes
+        data: "${GRAPH_FEEDBACK_REPUTATION_REGISTRY}"
+      registryKind:
+        type: String
+        data: reputation
+    source:
+      package:
+        moduleName: feedback_events
+        file: ../substreams/verity-agent-feedback-v0.1.0.spkg
+    mapping:
+      apiVersion: 0.0.7
+      kind: substreams/graph-entities
+      file: ./src/mapping.ts
+      handler: handleEvents
+
+  - kind: substreams
+    name: agent0FeedbackRevocations
+    network: base-sepolia
+    context:
+      chainId:
+        type: BigInt
+        data: "${GRAPH_AGENT0_CHAIN_ID}"
+      registryAddress:
+        type: Bytes
+        data: "${GRAPH_FEEDBACK_REPUTATION_REGISTRY}"
+      registryKind:
+        type: String
+        data: reputation
+    source:
+      package:
+        moduleName: feedback_revocations
+        file: ../substreams/verity-agent-feedback-v0.1.0.spkg
+    mapping:
+      apiVersion: 0.0.7
+      kind: substreams/graph-entities
+      file: ./src/mapping.ts
+      handler: handleEvents
+

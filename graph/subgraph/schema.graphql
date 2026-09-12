@@ -1,0 +1,47 @@
+# Agent0-compatible subset used by Verity routing.
+#
+# The entity IDs follow ERC-8004's chainId:agentId convention. Feedback is
+# derived from the standard Reputation Registry event and keeps the registry
+# address so a deployment can prove which registry it indexed.
+
+type Agent @entity(immutable: false) {
+  id: ID!
+  chainId: BigInt!
+  agentId: BigInt!
+  owner: Bytes
+  agentURI: String
+  registrationFile: AgentRegistrationFile
+  feedback: [Feedback!]! @derivedFrom(field: "agent")
+  totalFeedback: BigInt!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  lastActivity: BigInt!
+}
+
+type Feedback @entity(immutable: false) {
+  id: ID!
+  agent: Agent!
+  clientAddress: Bytes!
+  feedbackIndex: BigInt!
+  value: BigDecimal!
+  valueDecimals: Int!
+  tag1: String
+  tag2: String
+  endpoint: String
+  feedbackURI: String
+  feedbackHash: Bytes
+  isRevoked: Boolean!
+  createdAt: BigInt!
+  revokedAt: BigInt
+  transactionHash: Bytes!
+  registryAddress: Bytes!
+}
+
+type AgentRegistrationFile @entity(immutable: true) {
+  id: ID!
+  agent: Agent!
+  webEndpoint: String
+  rawURI: String!
+  createdAt: BigInt!
+}
+
