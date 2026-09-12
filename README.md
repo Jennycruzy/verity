@@ -212,6 +212,10 @@ The buyer calls the provider, receives the response, evaluates it locally, and s
 
 Live honest-path evidence from 2026-09-12:
 
+- Request `a7353260-8829-445e-ad23-d6f23baa3bae` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08`.
+- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789245767.729586729) transferred the configured amount to the provider treasury.
+- [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789245772.571672131) is readable from settlement topic `0.0.10501385`.
+
 - Request `1302814f-dcff-4653-8a64-4964cb0e975c` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08`.
 - [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) transferred `0.01 HBAR` to the configured provider treasury.
 - [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) is readable from settlement topic `0.0.10501385`.
@@ -250,6 +254,7 @@ Live Hedera Testnet records:
 | Dispute topic | `0.0.10501386` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501386) |
 | Bond escrow | `0.0.10502300` | [Contract](https://hashscan.io/testnet/contract/0.0.10502300) · [Creation transaction](https://hashscan.io/testnet/transaction/0.0.10472838@1789221045.369240725) |
 | Honest FX settlement | `1302814f-dcff-4653-8a64-4964cb0e975c` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) |
+| Latest honest FX settlement | `a7353260-8829-445e-ad23-d6f23baa3bae` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789245767.729586729) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789245772.571672131) |
 | Signed-transfer measurement | 100 seconds settled; 101 seconds expired | [100-second settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789224054.629001290) · [run record](docs/HOLD-WINDOW.md) |
 
 A replayable dispute ID will be added only after a complete live rejection is recorded.
