@@ -11,7 +11,10 @@ export interface VerifiedRoot {
   readonly action: string;
   readonly verifiedAt: string;
   readonly provider: "world-id";
+  readonly proofType?: WorldIdProofMode;
 }
+
+export type WorldIdProofMode = "uniqueness" | "session";
 
 export interface RootStore {
   has(action: string, root: string): Promise<boolean>;
@@ -22,6 +25,7 @@ export interface RootStore {
 export interface WorldIdVerifierConfig {
   readonly verifyUrl: string;
   readonly action: string;
+  readonly proofMode?: WorldIdProofMode;
 }
 
 type FetchLike = typeof fetch;
@@ -45,6 +49,27 @@ export function normalizeWorldRoot(value: string): string {
   const decimal = BigInt(normalized).toString(10);
   if (decimal === "0") throw new Error("VERITY_WORLD_ID_ROOT_INVALID: verifier returned a zero root");
   return decimal;
+}
+
+export function normalizeWorldProofMode(value: string | undefined, defaultMode: WorldIdProofMode = "session"): WorldIdProofMode {
+  const mode = value?.trim() || defaultMode;
+  if (mode !== "uniqueness" && mode !== "session") {
+    throw new Error("VERITY_WORLD_ID_MODE_INVALID: proof mode must be uniqueness or session");
+  }
+  return mode;
+}
+
+export function normalizeWorldSessionId(value: string): string {
+  const normalized = value.trim();
+  if (!/^session_[0-9a-fA-F]{128}$/.test(normalized)) {
+    throw new Error("VERITY_WORLD_ID_SESSION_INVALID: session ID must use session_<128 hex characters>");
+  }
+  return normalized.toLowerCase();
+}
+
+export function worldSessionRoot(sessionId: string): string {
+  const normalized = normalizeWorldSessionId(sessionId);
+  return normalizeWorldRoot(`0x${normalized.slice("session_".length, "session_".length + 64)}`);
 }
 
 export class WorldIdVerifier {
@@ -72,6 +97,9 @@ export class WorldIdVerifier {
     if (!response.ok || !isVerifiedResponse(body)) {
       throw new Error(`VERITY_WORLD_ID_REJECTED: ${response.status} ${JSON.stringify(body)}`);
     }
+    if ((this.config.proofMode ?? "uniqueness") === "session") {
+      return this.verifySession(proof, body);
+    }
     if (body.action !== this.config.action) {
       throw new Error(`VERITY_WORLD_ID_ACTION_MISMATCH: expected ${this.config.action}, received ${body.action}`);
     }
@@ -82,7 +110,30 @@ export class WorldIdVerifier {
     if (!await this.roots.claim(replayScope, root)) {
       throw new Error("VERITY_WORLD_ID_REPLAY: this proof has already been used for the configured action and signal");
     }
-    return { root, action: this.config.action, verifiedAt: new Date().toISOString(), provider: "world-id" };
+    return { root, action: this.config.action, verifiedAt: new Date().toISOString(), provider: "world-id", proofType: "uniqueness" };
+  }
+
+  private async verifySession(proof: WorldIdProof, body: WorldVerifyResponse): Promise<VerifiedRoot> {
+    const proofSessionId = extractSessionId(proof);
+    const verifiedSessionId = extractSessionId(body);
+    if (!proofSessionId || !verifiedSessionId) {
+      throw new Error("VERITY_WORLD_ID_SESSION_MISSING: session proof and verifier response must contain a session_id");
+    }
+    const normalizedProofSessionId = normalizeWorldSessionId(proofSessionId);
+    if (normalizedProofSessionId !== normalizeWorldSessionId(verifiedSessionId)) {
+      throw new Error("VERITY_WORLD_ID_SESSION_MISMATCH: verifier returned a different session_id");
+    }
+    const sessionNullifier = extractSessionNullifier(proof);
+    if (!sessionNullifier) {
+      throw new Error("VERITY_WORLD_ID_SESSION_NULLIFIER_MISSING: session proof contained no session_nullifier");
+    }
+    const replayKey = normalizeWorldRoot(sessionNullifier);
+    const root = worldSessionRoot(normalizedProofSessionId);
+    const replayScope = `${this.config.action}:session:${replayKey}`;
+    if (!await this.roots.claim(replayScope, root)) {
+      throw new Error("VERITY_WORLD_ID_REPLAY: this session proof has already been used");
+    }
+    return { root, action: this.config.action, verifiedAt: new Date().toISOString(), provider: "world-id", proofType: "session" };
   }
 }
 
@@ -240,15 +291,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isVerifiedResponse(value: unknown): value is WorldVerifyResponse {
   if (!value || typeof value !== "object") return false;
   const candidate = value as WorldVerifyResponse;
-  return typeof candidate.action === "string"
-    && (candidate.success === true || candidate.verified === true)
-    && Boolean(extractWorldRoot(candidate));
+  return candidate.success === true || candidate.verified === true;
 }
 
 interface WorldVerifyResponse {
   readonly action?: unknown;
   readonly success?: unknown;
   readonly verified?: unknown;
+  readonly session_id?: unknown;
   readonly nullifier?: unknown;
   readonly nullifierHash?: unknown;
   readonly nullifier_hash?: unknown;
@@ -263,6 +313,22 @@ function extractWorldRoot(value: WorldVerifyResponse): string | undefined {
     if (!isRecord(result)) continue;
     const nested = [result.nullifier, result.nullifierHash, result.nullifier_hash].find(isNonEmptyString);
     if (nested) return nested;
+  }
+  return undefined;
+}
+
+function extractSessionId(value: unknown): string | undefined {
+  if (!isRecord(value) || !isNonEmptyString(value.session_id)) return undefined;
+  return value.session_id;
+}
+
+function extractSessionNullifier(proof: WorldIdProof): string | undefined {
+  const direct = proof.session_nullifier;
+  if (Array.isArray(direct) && isNonEmptyString(direct[0])) return direct[0];
+  if (!Array.isArray(proof.responses)) return undefined;
+  for (const response of proof.responses) {
+    if (!isRecord(response) || !Array.isArray(response.session_nullifier)) continue;
+    if (isNonEmptyString(response.session_nullifier[0])) return response.session_nullifier[0];
   }
   return undefined;
 }

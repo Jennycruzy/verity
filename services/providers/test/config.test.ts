@@ -73,6 +73,7 @@ test("reads provider-side buyer admission configuration", () => {
     VERITY_BUYER_REPUTATION_API_KEY: "graph-key",
     VERITY_BUYER_REPUTATION_QUERY_FILE: "docs/graph/agent0-buyer.query.json",
     VERITY_BUYER_REPUTATION_MIN_HONESTY: "0.8",
+    WORLD_ID_PROOF_MODE: "session",
     WORLD_ID_VERIFY_URL: "https://world.invalid/verify",
     WORLD_ID_DISPUTE_ACTION: "verity-dispute"
   });
@@ -82,6 +83,7 @@ test("reads provider-side buyer admission configuration", () => {
     queryFile: "docs/graph/agent0-buyer.query.json",
     minimumHonesty: 0.8,
     verifyUrl: "https://world.invalid/verify",
-    action: "verity-dispute"
+    action: "verity-dispute",
+    proofMode: "session"
   });
 });

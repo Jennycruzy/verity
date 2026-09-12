@@ -58,7 +58,7 @@ export function createVerityFeedbackEvidence(input: FeedbackEvidenceInput): Feed
 export function canonicalHumanRoot(value: string): string {
   const normalized = requiredText(value, "humanRoot");
   if (!/^\d+$/.test(normalized) || BigInt(normalized) === 0n || BigInt(normalized).toString(10) !== normalized) {
-    throw new Error("VERITY_AGENT0_EVIDENCE_ROOT_INVALID: humanRoot must be a canonical positive decimal World nullifier");
+    throw new Error("VERITY_AGENT0_EVIDENCE_ROOT_INVALID: humanRoot must be a canonical positive decimal World identity commitment");
   }
   return normalized;
 }

@@ -12,11 +12,17 @@ const baseEnvironment: NodeJS.ProcessEnv = {
 };
 
 test("defaults the World ID browser environment to production", () => {
-  assert.equal(readWorldIdServiceConfig(baseEnvironment).environment, "production");
+  const config = readWorldIdServiceConfig(baseEnvironment);
+  assert.equal(config.environment, "production");
+  assert.equal(config.proofMode, "session");
 });
 
 test("accepts an explicit staging environment", () => {
   assert.equal(readWorldIdServiceConfig({ ...baseEnvironment, WORLD_ID_ENVIRONMENT: "staging" }).environment, "staging");
+});
+
+test("accepts uniqueness mode for an action-scoped deployment", () => {
+  assert.equal(readWorldIdServiceConfig({ ...baseEnvironment, WORLD_ID_PROOF_MODE: "uniqueness" }).proofMode, "uniqueness");
 });
 
 test("rejects an unknown World ID environment", () => {

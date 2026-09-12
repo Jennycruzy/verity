@@ -1,11 +1,12 @@
 import "dotenv/config";
 import { readFile, writeFile } from "node:fs/promises";
-import { FileRootStore, WorldIdVerifier } from "@verity/agent";
+import { FileRootStore, normalizeWorldProofMode, WorldIdVerifier } from "@verity/agent";
 
 const envPath = ".env";
 const providerId = required("VERITY_PROVIDER_ID");
 const verifyUrl = required("WORLD_ID_VERIFY_URL");
-const action = required("WORLD_ID_DISPUTE_ACTION");
+const action = required("WORLD_ID_PROVIDER_ACTION");
+const proofMode = normalizeWorldProofMode(process.env.WORLD_ID_PROOF_MODE);
 const signal = required("VERITY_PROVIDER_IDENTITY_SIGNAL");
 const proof = parseProof(required("VERITY_PROVIDER_IDENTITY_PROOF_JSON"));
 const rootStorePath = required("VERITY_PROVIDER_ROOT_STORE_PATH");
@@ -13,11 +14,11 @@ if (process.env.VERITY_PROVIDER_ROOT?.trim()) {
   throw new Error("VERITY_PROVIDER_ROOT_ALREADY_CONFIGURED: clear the provider root only if a new registration is intentional");
 }
 
-const verifier = new WorldIdVerifier({ verifyUrl, action }, new FileRootStore(rootStorePath));
+const verifier = new WorldIdVerifier({ verifyUrl, action, proofMode }, new FileRootStore(rootStorePath));
 const verified = await verifier.verify(proof, signal);
 const envText = await readFile(envPath, "utf8");
 await writeFile(envPath, replaceEnvValue(envText, "VERITY_PROVIDER_ROOT", verified.root), "utf8");
-console.log(JSON.stringify({ providerId, action, root: verified.root, envPath }, null, 2));
+console.log(JSON.stringify({ providerId, action, proofMode, root: verified.root, envPath }, null, 2));
 
 function required(name: string): string {
   const value = process.env[name]?.trim();

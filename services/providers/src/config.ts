@@ -1,3 +1,4 @@
+import { normalizeWorldProofMode, type WorldIdProofMode } from "@verity/agent";
 import { readProviderConfig, type ProviderConfig } from "@verity/hedera";
 
 export type ProviderKind = "fx" | "entity";
@@ -9,6 +10,7 @@ export interface BuyerReputationPolicyConfig {
   readonly minimumHonesty: number;
   readonly verifyUrl: string;
   readonly action: string;
+  readonly proofMode: WorldIdProofMode;
 }
 
 export interface ProviderServiceConfig extends ProviderConfig {
@@ -122,7 +124,7 @@ function readBuyerReputationConfig(env: NodeJS.ProcessEnv): BuyerReputationPolic
   }
   const verifyUrl = requiredHttpUrl(env, "WORLD_ID_VERIFY_URL");
   const action = required(env, "WORLD_ID_DISPUTE_ACTION");
-  return { endpoint, apiKey, queryFile, minimumHonesty, verifyUrl, action };
+  return { endpoint, apiKey, queryFile, minimumHonesty, verifyUrl, action, proofMode: normalizeWorldProofMode(env.WORLD_ID_PROOF_MODE) };
 }
 
 function requiredHttpUrl(env: NodeJS.ProcessEnv, name: string): string {

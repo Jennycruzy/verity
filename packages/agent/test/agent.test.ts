@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { adjudicate } from "../src/adjudication.ts";
 import { requireDisputeEligibility } from "../src/dispute.ts";
-import { FileRootStore, hashWorldSignal, MemoryRootStore, normalizeWorldRoot, WorldIdVerifier } from "../src/identity.ts";
+import { FileRootStore, hashWorldSignal, MemoryRootStore, normalizeWorldProofMode, normalizeWorldRoot, normalizeWorldSessionId, worldSessionRoot, WorldIdVerifier } from "../src/identity.ts";
 
 test("majority adjudication is deterministic and rule-bound", async () => {
   const result = await adjudicate(
@@ -56,6 +56,16 @@ test("normalizes equivalent hexadecimal roots to one durable key", () => {
   assert.equal(normalizeWorldRoot("0x000A"), "10");
   assert.equal(normalizeWorldRoot("0x0a"), "10");
   assert.throws(() => normalizeWorldRoot("0x0"), /VERITY_WORLD_ID_ROOT_INVALID/);
+});
+
+test("normalizes World ID session roots from the stable session commitment", () => {
+  const sessionId = `session_${"ab".repeat(64)}`;
+  assert.equal(normalizeWorldProofMode(undefined), "session");
+  assert.equal(normalizeWorldProofMode(" uniqueness "), "uniqueness");
+  assert.equal(normalizeWorldSessionId(sessionId), sessionId);
+  assert.equal(worldSessionRoot(sessionId), BigInt(`0x${"ab".repeat(32)}`).toString(10));
+  assert.throws(() => normalizeWorldSessionId("session_short"), /VERITY_WORLD_ID_SESSION_INVALID/);
+  assert.throws(() => normalizeWorldProofMode("unknown"), /VERITY_WORLD_ID_MODE_INVALID/);
 });
 
 test("World ID verifier stores a durable root and rejects proof reuse", async () => {
@@ -120,7 +130,7 @@ test("World ID verifier accepts a legacy nullifier_hash response", async () => {
   assert.equal(verified.root, "42");
 });
 
-test("World ID verifier reads a nested uniqueness result and refuses session-only responses", async () => {
+test("World ID verifier reads a nested uniqueness result and refuses a session response in uniqueness mode", async () => {
   const nested = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },
     new MemoryRootStore(),
@@ -136,7 +146,40 @@ test("World ID verifier reads a nested uniqueness result and refuses session-onl
   );
   await assert.rejects(
     sessionOnly.verify({ proof: "opaque", signal_hash: hashWorldSignal("provider-account") }, "provider-account"),
-    /VERITY_WORLD_ID_REJECTED/
+    /VERITY_WORLD_ID_ROOT_MISSING/
+  );
+});
+
+test("World ID verifier uses a stable session root and consumes each session proof once", async () => {
+  const signal = "session-dispute";
+  const sessionId = `session_${"cd".repeat(64)}`;
+  const proof = {
+    protocol_version: "4.0",
+    session_id: sessionId,
+    responses: [{ signal_hash: hashWorldSignal(signal), session_nullifier: ["0x2d", "0x30"] }]
+  };
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "verity-dispute", proofMode: "session" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, session_id: sessionId, results: [{ success: true }] }), { status: 200 })
+  );
+  const verified = await verifier.verify(proof, signal);
+  assert.equal(verified.root, worldSessionRoot(sessionId));
+  assert.equal(verified.proofType, "session");
+  await assert.rejects(verifier.verify(proof, signal), /VERITY_WORLD_ID_REPLAY/);
+});
+
+test("World ID verifier rejects a session response bound to another session", async () => {
+  const proofSessionId = `session_${"cd".repeat(64)}`;
+  const verifiedSessionId = `session_${"ef".repeat(64)}`;
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "verity-dispute", proofMode: "session" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, session_id: verifiedSessionId }), { status: 200 })
+  );
+  await assert.rejects(
+    verifier.verify({ session_id: proofSessionId, responses: [{ signal_hash: hashWorldSignal("session"), session_nullifier: ["0x31"] }] }, "session"),
+    /VERITY_WORLD_ID_SESSION_MISMATCH/
   );
 });
 

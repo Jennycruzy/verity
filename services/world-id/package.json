@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "dependencies": {
+    "@verity/agent": "0.1.0",
     "@worldcoin/idkit-core": "4.2.4",
     "dotenv": "^16.4.7"
   },

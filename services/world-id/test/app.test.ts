@@ -11,7 +11,8 @@ const config: WorldIdServiceConfig = {
   signingKeyHex: `0x${"11".repeat(32)}`,
   verifyUrl: "https://developer.world.org/api/v4/verify/rp_test",
   allowedActions: ["verity-provider-registration", "verity-dispute"],
-  environment: "staging"
+  environment: "staging",
+  proofMode: "uniqueness"
 };
 
 test("issues an RP signature only for an allowed action", async () => {
@@ -25,6 +26,20 @@ test("issues an RP signature only for an allowed action", async () => {
   assert.equal(body.environment, "staging");
   assert.match(String(body.sig), /^0x/);
   assert.match(String(body.nonce), /^0x/);
+});
+
+test("issues an action-free RP signature for session proofs", async () => {
+  const result = responseForTest();
+  await handleWorldIdRequest(
+    requestForTest("/rp-signature", JSON.stringify({}), "POST"),
+    result.response,
+    { ...config, proofMode: "session" }
+  );
+  assert.equal(result.status(), 200);
+  const body = JSON.parse(result.body()) as Record<string, unknown>;
+  assert.equal(body.proof_mode, "session");
+  assert.equal(body.action, undefined);
+  assert.match(String(body.sig), /^0x/);
 });
 
 test("forwards the IDKit payload unchanged to the configured verifier", async () => {
@@ -54,6 +69,14 @@ test("serves an operator proof page without exposing the signing key", async () 
   assert.equal(result.status(), 200);
   assert.match(result.body(), /IDKit\.proofOfHuman/);
   assert.doesNotMatch(result.body(), /1111111111111111111111111111111111111111111111111111111111111111/);
+});
+
+test("serves the configured session proof workflow", async () => {
+  const result = responseForTest();
+  await handleWorldIdRequest(requestForTest("/", "", "GET"), result.response, { ...config, proofMode: "session" });
+  assert.match(result.body(), /IDKit\.createSession/);
+  assert.match(result.body(), /IDKit\.proveSession/);
+  assert.match(result.body(), /session commitment becomes the durable human root/);
 });
 
 function requestForTest(path: string, body: string, method = "POST"): Readable & { method: string; url: string; headers: Record<string, string> } {

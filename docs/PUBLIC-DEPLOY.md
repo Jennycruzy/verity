@@ -57,6 +57,8 @@ WORLD_ID_APP_ID=<app_id>
 WORLD_ID_RP_ID=<rp_id>
 WORLD_ID_SIGNING_KEY=<local-world-signing-key>
 WORLD_ID_VERIFY_URL=https://developer.world.org/api/v4/verify/<rp_id>
+WORLD_ID_PROOF_MODE=session
+WORLD_ID_PROVIDER_ACTION=verity-provider-registration
 WORLD_ID_DISPUTE_ACTION=<configured-world-action>
 WORLD_ID_ENVIRONMENT=production
 

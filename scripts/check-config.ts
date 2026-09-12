@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { normalizeWorldProofMode } from "@verity/agent";
 import { Blocky402Client, discoverHederaCapability } from "@verity/hedera";
 import { normalizeMirrorNodeBaseUrl } from "@verity/hcs";
 
@@ -69,6 +70,7 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     required("VERITY_PROVIDER_ROOT", "provider", "verified provider human root"),
     required("VERITY_PROVIDER_STAKE", "provider", "provider stake amount in tinybars"),
     required("VERITY_PROVIDER_PUBLIC_URL", "provider", "public provider URL for identity registration"),
+    required("WORLD_ID_PROVIDER_ACTION", "provider", "World ID provider-registration action"),
     required("VERITY_ERC8004_REGISTRY", "provider", "normalized ERC-8004 registry reference"),
     required("VERITY_ERC8004_AGENT_ID", "provider", "ERC-8004 agent ID"),
     required("VERITY_ERC8004_RPC_URL", "provider", "EVM JSON-RPC URL for ERC-8004 registration"),
@@ -138,15 +140,28 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     env.WORLD_ID_RP_ID?.trim(),
     env.WORLD_ID_SIGNING_KEY?.trim(),
     env.WORLD_ID_VERIFY_URL?.trim(),
+    env.WORLD_ID_PROVIDER_ACTION?.trim(),
     env.WORLD_ID_DISPUTE_ACTION?.trim()
   ].filter(Boolean).length;
-  if (worldFields !== 0 && worldFields !== 5) {
+  if (worldFields !== 0 && worldFields !== 6) {
     checks.push({
-      key: "WORLD_ID_APP_ID + WORLD_ID_RP_ID + WORLD_ID_SIGNING_KEY + WORLD_ID_VERIFY_URL + WORLD_ID_DISPUTE_ACTION",
+      key: "WORLD_ID_APP_ID + WORLD_ID_RP_ID + WORLD_ID_SIGNING_KEY + WORLD_ID_VERIFY_URL + WORLD_ID_PROVIDER_ACTION + WORLD_ID_DISPUTE_ACTION",
       state: "invalid",
       scope: "dispute",
       detail: "set all World ID service values together"
     });
+  }
+  if (env.WORLD_ID_PROOF_MODE?.trim()) {
+    try {
+      normalizeWorldProofMode(env.WORLD_ID_PROOF_MODE);
+    } catch (error) {
+      checks.push({
+        key: "WORLD_ID_PROOF_MODE",
+        state: "invalid",
+        scope: "dispute",
+        detail: errorMessage(error)
+      });
+    }
   }
 
   const buyerReputationFields = [

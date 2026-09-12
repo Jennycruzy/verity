@@ -16,7 +16,7 @@ loadDotenv({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 const config = readDisputeServiceConfig();
 const providers = await readProviderRegistryFromHcs(config.mirrorNodeBaseUrl, config.providerTopicId, { escrowContractId: config.escrowContractId });
 const identity = new WorldIdVerifier(
-  { verifyUrl: config.worldVerifyUrl, action: config.worldAction },
+  { verifyUrl: config.worldVerifyUrl, action: config.worldAction, proofMode: config.worldProofMode },
   new FileRootStore(config.rootStorePath)
 );
 const checkers = config.checkers.map((checker) => new HttpCrossChecker(checker.id, checker.url, config.checkerTimeoutMs));

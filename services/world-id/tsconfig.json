@@ -6,5 +6,6 @@
     "rootDir": "src",
     "declaration": true
   },
+  "references": [{ "path": "../../packages/agent" }],
   "include": ["src/**/*.ts"]
 }

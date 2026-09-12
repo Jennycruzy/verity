@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { signRequest } from "@worldcoin/idkit-core/signing";
+import { normalizeWorldSessionId } from "@verity/agent";
 import type { WorldIdServiceConfig } from "./config.js";
-import { WORLD_ID_PROOF_PAGE } from "./page.js";
+import { renderWorldIdProofPage } from "./page.js";
 
 export function createWorldIdServer(config: WorldIdServiceConfig, fetchImpl: typeof fetch = fetch) {
   return createServer((request, response) => {
@@ -22,7 +23,7 @@ export async function handleWorldIdRequest(
     response.statusCode = 200;
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.setHeader("cache-control", "no-store");
-    response.end(WORLD_ID_PROOF_PAGE);
+    response.end(renderWorldIdProofPage(config.proofMode ?? "uniqueness"));
     return;
   }
   if (request.method === "GET" && path === "/health") {
@@ -35,6 +36,23 @@ export async function handleWorldIdRequest(
   }
   const body = await readJson(request, 32_768);
   if (path === "/rp-signature") {
+    if ((config.proofMode ?? "uniqueness") === "session") {
+      const suppliedSessionId = optionalString(body.session_id);
+      if (suppliedSessionId) normalizeWorldSessionId(suppliedSessionId);
+      const signature = signRequest({ signingKeyHex: config.signingKeyHex });
+      writeJson(response, 200, {
+        app_id: config.appId,
+        rp_id: config.rpId,
+        sig: signature.sig,
+        nonce: signature.nonce,
+        created_at: signature.createdAt,
+        expires_at: signature.expiresAt,
+        environment: config.environment,
+        proof_mode: "session",
+        ...(suppliedSessionId ? { session_id: suppliedSessionId } : {})
+      });
+      return;
+    }
     const action = requiredString(body.action, "action");
     if (!config.allowedActions.includes(action)) throw new Error(`VERITY_WORLD_ACTION_FORBIDDEN: action ${action} is not configured`);
     const signature = signRequest({ signingKeyHex: config.signingKeyHex, action });
@@ -89,6 +107,12 @@ async function readJson(request: IncomingMessage, maxBytes: number): Promise<Rec
 
 function requiredString(value: unknown, name: string): string {
   if (typeof value !== "string" || !value.trim()) throw new Error(`VERITY_WORLD_FIELD_MISSING: ${name} is required`);
+  return value.trim();
+}
+
+function optionalString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || !value.trim()) throw new Error("VERITY_WORLD_SESSION_INVALID: session_id must be a non-empty string");
   return value.trim();
 }
 

@@ -25,6 +25,7 @@ test("loads checker and dispute service configuration", () => {
   const config = readDisputeServiceConfig(baseEnv);
   assert.equal(config.port, 8091);
   assert.equal(config.providerTopicId, "0.0.9");
+  assert.equal(config.worldProofMode, "session");
   assert.deepEqual(config.checkers, [
     { id: "a", url: "https://a.invalid/check" },
     { id: "b", url: "https://b.invalid/check" },

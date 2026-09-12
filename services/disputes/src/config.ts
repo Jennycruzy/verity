@@ -1,3 +1,5 @@
+import { normalizeWorldProofMode, type WorldIdProofMode } from "@verity/agent";
+
 export interface CheckerConfig {
   readonly id: string;
   readonly url: string;
@@ -14,6 +16,7 @@ export interface DisputeServiceConfig {
   readonly disputeStoreDirectory: string;
   readonly worldVerifyUrl: string;
   readonly worldAction: string;
+  readonly worldProofMode: WorldIdProofMode;
   readonly mirrorNodeBaseUrl: string;
   readonly escrowContractId: string;
 }
@@ -43,6 +46,7 @@ export function readDisputeServiceConfig(env: NodeJS.ProcessEnv = process.env): 
     disputeStoreDirectory: required(env, "DISPUTE_STORE_DIR"),
     worldVerifyUrl: requiredHttpUrl(env, "WORLD_ID_VERIFY_URL"),
     worldAction: required(env, "WORLD_ID_DISPUTE_ACTION"),
+    worldProofMode: normalizeWorldProofMode(env.WORLD_ID_PROOF_MODE),
     mirrorNodeBaseUrl: requiredHttpUrl(env, "MIRROR_NODE_BASE_URL"),
     escrowContractId: requiredHederaId(env, "VERITY_ESCROW_CONTRACT_ID")
   };

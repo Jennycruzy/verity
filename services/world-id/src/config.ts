@@ -1,3 +1,5 @@
+import { normalizeWorldProofMode, type WorldIdProofMode } from "@verity/agent";
+
 export interface WorldIdServiceConfig {
   readonly port: number;
   readonly appId: string;
@@ -6,6 +8,7 @@ export interface WorldIdServiceConfig {
   readonly verifyUrl: string;
   readonly allowedActions: readonly string[];
   readonly environment: "production" | "staging" | "sandbox";
+  readonly proofMode: WorldIdProofMode;
 }
 
 export function readWorldIdServiceConfig(env: NodeJS.ProcessEnv = process.env): WorldIdServiceConfig {
@@ -28,7 +31,8 @@ export function readWorldIdServiceConfig(env: NodeJS.ProcessEnv = process.env): 
     signingKeyHex,
     verifyUrl,
     allowedActions,
-    environment
+    environment,
+    proofMode: normalizeWorldProofMode(env.WORLD_ID_PROOF_MODE)
   };
 }
 

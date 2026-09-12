@@ -36,7 +36,7 @@ export class BuyerReputationPolicy {
 
   public async assertEligible(request: ProtectedRequest): Promise<void> {
     const root = requiredHeader(request, VERITY_HUMAN_ROOT_HEADER, "VERITY_BUYER_HUMAN_ROOT_REQUIRED");
-    if (!/^\d+$/.test(root)) throw new BuyerAdmissionError("VERITY_BUYER_HUMAN_ROOT_INVALID: human root must be a canonical decimal World nullifier");
+    if (!/^\d+$/.test(root)) throw new BuyerAdmissionError("VERITY_BUYER_HUMAN_ROOT_INVALID: human root must be a canonical decimal World identity commitment");
     const signal = requiredHeader(request, VERITY_WORLD_SIGNAL_HEADER, "VERITY_BUYER_SIGNAL_REQUIRED");
     const proof = parseProof(requiredHeader(request, VERITY_WORLD_PROOF_HEADER, "VERITY_BUYER_PROOF_REQUIRED"));
 
@@ -76,7 +76,7 @@ export async function createBuyerReputationPolicy(
     config.apiKey
   );
   const identity = new WorldIdVerifier(
-    { verifyUrl: config.verifyUrl, action: config.action },
+    { verifyUrl: config.verifyUrl, action: config.action, proofMode: config.proofMode },
     new MemoryRootStore(),
     fetchImpl
   );

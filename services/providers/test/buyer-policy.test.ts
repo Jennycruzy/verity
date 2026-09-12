@@ -15,7 +15,7 @@ test("requires a World proof and human root before provider delivery", async () 
   );
 });
 
-test("binds provider admission to the proof's nullifier root", async () => {
+test("binds provider admission to the proof's human identity root", async () => {
   const policy = new BuyerReputationPolicy(
     { verify: async () => ({ root: "42", action: "verity-dispute", verifiedAt: "now", provider: "world-id" }) },
     { buyer: async (root) => ({ root, honestyScore: 1, disputes: 0 }) },
