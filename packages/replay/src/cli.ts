@@ -1,11 +1,16 @@
 import "dotenv/config";
+import { readReplayDisputeId } from "./args.js";
 import { replayDispute } from "./index.js";
 
-const disputeId = process.argv[2];
-if (!disputeId) {
-  console.error("Usage: verity replay <disputeId>");
+let disputeId: string | undefined;
+try {
+  disputeId = readReplayDisputeId(process.argv.slice(2));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
   process.exitCode = 2;
-} else {
+}
+
+if (disputeId) {
   try {
     const result = await replayDispute(disputeId, {
       mirrorNodeBaseUrl: required("MIRROR_NODE_BASE_URL"),
