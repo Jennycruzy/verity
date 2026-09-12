@@ -2,16 +2,26 @@ import type { CrossCheckInput, CrossChecker } from "@verity/agent";
 import type { DeterministicVerdict } from "@verity/types";
 
 export class HttpCrossChecker implements CrossChecker {
+  public readonly id: string;
+
   public constructor(
-    public readonly id: string,
-    private readonly url: string,
+    id: string,
+    url: string,
     private readonly requestTimeoutMs = 10_000,
     private readonly fetchImpl: typeof fetch = fetch
   ) {
-    if (!id.trim()) throw new Error("VERITY_CHECKER_ID_MISSING: every checker needs an ID");
-    if (!url.trim()) throw new Error(`VERITY_CHECKER_URL_MISSING: ${id} has no URL`);
+    this.id = id.trim();
+    const normalizedUrl = url.trim();
+    if (!this.id) throw new Error("VERITY_CHECKER_ID_MISSING: every checker needs an ID");
+    if (!normalizedUrl) throw new Error(`VERITY_CHECKER_URL_MISSING: ${this.id} has no URL`);
+    if (!URL.canParse(normalizedUrl) || !["http:", "https:"].includes(new URL(normalizedUrl).protocol)) {
+      throw new Error(`VERITY_CHECKER_URL_INVALID: ${this.id} needs an absolute HTTP(S) URL`);
+    }
+    this.url = normalizedUrl;
     if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs <= 0) throw new Error("VERITY_CHECKER_TIMEOUT_INVALID: use a positive integer");
   }
+
+  private readonly url: string;
 
   public async check(input: CrossCheckInput): Promise<DeterministicVerdict> {
     const controller = new AbortController();
