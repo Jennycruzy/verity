@@ -24,6 +24,10 @@ test("stable JSON sorts object keys without changing array order", () => {
   assert.equal(stableJson({ b: 2, a: 1, list: [{ z: true, y: false }] }), '{"a":1,"b":2,"list":[{"y":false,"z":true}]}');
 });
 
+test("stable JSON omits undefined optional object properties", () => {
+  assert.equal(stableJson({ present: true, optional: undefined }), '{"present":true}');
+});
+
 test("stable JSON rejects values that would hash ambiguously", () => {
   assert.throws(() => stableJson(undefined), /VERITY_JSON_UNSUPPORTED/);
   assert.throws(() => stableJson({ value: Number.NaN }), /VERITY_JSON_UNSUPPORTED/);

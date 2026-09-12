@@ -189,7 +189,7 @@ function stableJsonValue(value: unknown, path: string, ancestors: WeakSet<object
       throw new Error(`VERITY_JSON_UNSUPPORTED: ${path} contains symbol keys`);
     }
     const objectValue = value as Record<string, unknown>;
-    const keys = Object.keys(objectValue).sort();
+    const keys = Object.keys(objectValue).filter((key) => objectValue[key] !== undefined).sort();
     return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJsonValue(objectValue[key], `${path}.${key}`, ancestors)}`).join(",")}}`;
   } finally {
     ancestors.delete(value);
