@@ -34,7 +34,7 @@ try {
     recordedAt: new Date().toISOString(),
     payload: { providerId, providerRoot, providerStakeAmount, providerAddress, stakeTransactionId: result.transactionId }
   });
-  registry.push({ providerId, providerRoot, providerStakeAmount, providerAddress });
+  registry.push({ providerId, providerRoot, providerStakeAmount, providerAddress, stakeTransactionId: result.transactionId });
   await mkdir(dirname(registryPath), { recursive: true });
   await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
   console.log(JSON.stringify({ providerId, providerRoot, providerStakeAmount, providerAddress, transactionId: result.transactionId, hcsTransactionId }, null, 2));
@@ -69,6 +69,7 @@ interface RegistryEntry {
   readonly providerRoot: string;
   readonly providerStakeAmount: string;
   readonly providerAddress: string;
+  readonly stakeTransactionId?: string;
 }
 
 async function readRegistry(path: string): Promise<RegistryEntry[]> {

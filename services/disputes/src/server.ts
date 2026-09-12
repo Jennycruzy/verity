@@ -11,7 +11,7 @@ import { DisputeProcessor } from "./service.js";
 import { FileDisputeStore } from "./store.js";
 
 const config = readDisputeServiceConfig();
-const providers = await readProviderRegistryFromHcs(config.mirrorNodeBaseUrl, config.providerTopicId);
+const providers = await readProviderRegistryFromHcs(config.mirrorNodeBaseUrl, config.providerTopicId, { escrowContractId: config.escrowContractId });
 const identity = new WorldIdVerifier(
   { verifyUrl: config.worldVerifyUrl, action: config.worldAction },
   new FileRootStore(config.rootStorePath)

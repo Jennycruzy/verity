@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Interface } from "ethers";
 import test from "node:test";
-import { encodeHcsRecord } from "@verity/hcs";
+import { encodeHcsRecord, toBytes32 } from "@verity/hcs";
 import { readProviderRegistry, readProviderRegistryFromHcs } from "../src/registry.ts";
 
 test("loads provider roots and stake amounts from the configured registry", async () => {
@@ -33,6 +34,9 @@ test("rejects duplicate provider records", async () => {
 });
 
 test("loads provider records from the settlement HCS topic", async () => {
+  const stakeAddress = `0x${"01".repeat(20)}`;
+  const stakeParameters = new Interface(["function stakeProvider(bytes32 providerRoot) payable"])
+    .encodeFunctionData("stakeProvider", [bytes32("root-1")]);
   const message = encodeHcsRecord({
     schema: "verity/hcs/v1",
     kind: "provider",
@@ -49,10 +53,35 @@ test("loads provider records from the settlement HCS topic", async () => {
   const registry = await readProviderRegistryFromHcs(
     "https://mirror.invalid/api/v1",
     "0.0.9",
-    async () => new Response(JSON.stringify({
-      messages: [{ consensus_timestamp: "1.000000000", sequence_number: 1, message: Buffer.from(message).toString("base64") }],
-      links: {}
-    }), { status: 200 })
+    {
+      escrowContractId: contractId,
+      fetchImpl: async (input) => {
+        if (String(input).includes("/topics/")) {
+          return new Response(JSON.stringify({
+            messages: [{ consensus_timestamp: "1.000000000", sequence_number: 1, message: Buffer.from(message).toString("base64") }],
+            links: {}
+          }), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          contract_id: contractId,
+          from: stakeAddress,
+          amount: "20",
+          function_parameters: stakeParameters,
+          result: "SUCCESS"
+        }), { status: 200 });
+      }
+    }
   );
-  assert.deepEqual(await registry.get("provider-1"), { providerRoot: "root-1", providerStakeAmount: "20", providerAddress: `0x${"01".repeat(20)}` });
+  assert.deepEqual(await registry.get("provider-1"), {
+    providerRoot: "root-1",
+    providerStakeAmount: "20",
+    providerAddress: `0x${"01".repeat(20)}`,
+    stakeTransactionId: "0.0.7@1.000000000"
+  });
 });
+
+const contractId = "0.0.10";
+
+function bytes32(value: string): string {
+  return `0x${Buffer.from(toBytes32(value)).toString("hex")}`;
+}

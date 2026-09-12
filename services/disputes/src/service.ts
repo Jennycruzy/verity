@@ -10,6 +10,7 @@ export interface ProviderRecord {
   readonly providerRoot: string;
   readonly providerStakeAmount: string;
   readonly providerAddress: string;
+  readonly stakeTransactionId?: string;
 }
 
 export interface ProviderRegistry {
