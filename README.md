@@ -158,6 +158,8 @@ npm run graph:gateway
 
 Set `GRAPH_GATEWAY_PRICE` and `GRAPH_GATEWAY_UPSTREAM_API_KEY` first. The service rejects mutations, subscriptions, oversized bodies, invalid upstream JSON, and upstream timeouts. Point the buying agent's `GRAPH_SUBGRAPH_URL` at this public `/query` URL so reputation lookup is a real paid dependency rather than decorative data access.
 
+The routing proof uses that paid transport directly. Set `GRAPH_MIN_RELIABILITY`, `GRAPH_ROUTE_CANDIDATES_JSON`, and the two Agent0 query files, then run `npm run graph:route`. It prints the selected endpoint and queried score. Changing the indexed score changes the selected provider; deleting the Subgraph or removing the x402 resource causes the command to fail instead of silently using a local cache.
+
 With the same Graph configuration, start the public explorer with `npm --workspace @verity/explorer start`. Open `http://127.0.0.1:8787/` to query provider reliability or buyer honesty. The browser page and JSON routes both call `GraphReputationClient`; there is no parallel local reputation database.
 
 The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the settlement HCS topic, and the Mirror Node URL. It loads provider eligibility from `provider` records on that topic; the local provider JSON is only an operator cache. A local FX quorum can combine two independently started Node checkers with the separate Go checker:
