@@ -29,6 +29,7 @@
     "contracts:deploy": "tsx scripts/deploy-escrow.ts",
     "measure-hold": "tsx scripts/measure-hold-window.ts",
     "demo": "tsx scripts/demo.ts",
+    "dispute:demo": "tsx scripts/dispute-demo.ts",
     "contracts:test": "forge test --offline"
   },
   "dependencies": {
