@@ -40,3 +40,15 @@ test("rejects invalid base64 before decoding a topic message", async () => {
     /VERITY_MIRROR_SCHEMA/
   );
 });
+
+test("rejects repeated pagination links", async () => {
+  await assert.rejects(
+    () => readTopicRecords("https://mirror.invalid", "0.0.7", {
+      fetchImpl: async (input) => new Response(JSON.stringify({
+        messages: [],
+        links: { next: String(input) }
+      }), { status: 200 })
+    }),
+    /VERITY_MIRROR_PAGINATION_LOOP/
+  );
+});

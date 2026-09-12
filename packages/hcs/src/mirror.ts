@@ -23,9 +23,12 @@ export async function readTopicRecords(
   }
   const fetchImpl = options.fetchImpl ?? fetch;
   const records: HcsRecord[] = [];
+  const visitedUrls = new Set<string>();
   let nextUrl: string | null = `${normalizeMirrorNodeBaseUrl(mirrorNodeBaseUrl)}/topics/${encodeURIComponent(topicId)}/messages`;
 
   while (nextUrl) {
+    if (visitedUrls.has(nextUrl)) throw new Error(`VERITY_MIRROR_PAGINATION_LOOP: Mirror Node repeated ${nextUrl}`);
+    visitedUrls.add(nextUrl);
     const response = await fetchImpl(nextUrl);
     const raw = await response.text();
     if (!response.ok) {
