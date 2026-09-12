@@ -150,7 +150,7 @@ The service accepts `POST /disputes` and requires an idempotency key matching `d
 
 ## Escrow and provider stake
 
-Compile and deploy the contract only after setting the minimum bond and gas in `.env`:
+Compile and deploy the contract only after setting the minimum bond, gas, and bytecode-upload fee budget in `.env`:
 
 ```sh
 npm run contracts:test
@@ -204,7 +204,15 @@ The settlement topic is configured by `HCS_SETTLEMENT_TOPIC_ID`; the dispute top
 2. `verdict`: the rule and compact checker votes.
 3. `bond`: bond, stake, reputation, and payment transaction IDs.
 
-No live contract address, topic ID, or replayable dispute ID is claimed in this repository yet. Once testnet deployment is run, add the returned IDs and direct HashScan links here before presenting the project.
+Live Hedera Testnet records:
+
+| Resource | ID | Evidence |
+| --- | --- | --- |
+| Settlement topic | `0.0.10501385` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501385) |
+| Dispute topic | `0.0.10501386` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501386) |
+| Bond escrow | `0.0.10502300` | [Contract](https://hashscan.io/testnet/contract/0.0.10502300) · [Creation transaction](https://hashscan.io/testnet/transaction/0.0.10472838@1789221045.369240725) |
+
+A replayable dispute ID will be added only after a complete live rejection is recorded.
 
 ## Hedera-specific rationale
 
@@ -215,11 +223,11 @@ The resource server delivers before settlement, so the payment hold must survive
 | Capability | Evidence in this repository | Current status |
 | --- | --- | --- |
 | Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; needs a live testnet run |
-| HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; needs provisioned topics |
+| HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; settlement and dispute topics live on testnet |
 | Mirror Node replay | `packages/replay/src/index.ts:1` | Implemented and tested |
-| Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Implemented; needs deployment and funded accounts |
+| Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed on testnet; provider stake remains to be posted |
 | Proof of Human root | `packages/agent/src/identity.ts:1` | Adapter implemented; World credentials/config required |
-| Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor implemented; public score indexing remains |
+| Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor deployed; public score indexing remains |
 | Graph composition and MCP/SKILL tooling | `packages/indexer/src/client.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Paid Graph transport, routing, MCP handler, and reusable skill implemented; hosted Subgraph/Substreams deployment remains |
 | Scheduled transactions | `contracts/src/VerityBondEscrow.sol:88`, `packages/hcs/src/escrow.ts:42`, and `packages/sdk/src/buy.ts:1` | Expiring bonds, wait-for-expiry scheduling, and SDK wiring implemented; needs a live testnet run |
 | HTS custom fee settlement asset | `packages/hcs/src/token.ts:1` and `scripts/provision-token.ts:1` | Optional provisioning, association assertions, metadata checks, and same-token fee implemented; needs a live testnet run |
@@ -227,7 +235,7 @@ The resource server delivers before settlement, so the payment hold must survive
 
 ## Limitations
 
-Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption, live contract IDs, HCS IDs, and real dispute IDs are intentionally absent until they are produced by testnet runs rather than documentation.
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, content storage is file-backed, and the Graph client has no hosted Subgraph or Substreams deployment in this repository. Paid Graph queries require a live Graph endpoint that returns an x402 challenge. The current Agent0 deployment does not list an ERC-8004 registry on Hedera testnet, so this repository does not claim one. World ID verification requires the operator's configured endpoint and action. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption and a real replayable dispute remain outstanding.
 
 ## Adoption
 
