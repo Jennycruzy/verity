@@ -38,9 +38,16 @@ export async function readQueryFile(path: string): Promise<ReputationQuery> {
   if (!value || typeof value !== "object" || typeof (value as { query?: unknown }).query !== "string") {
     throw new Error(`VERITY_EXPLORER_QUERY_SCHEMA: ${path} must contain a query string`);
   }
-  const query = value as { query: string; variables?: unknown };
+  const query = value as { query: string; variables?: unknown; format?: unknown };
   if (query.variables !== undefined && (typeof query.variables !== "object" || query.variables === null || Array.isArray(query.variables))) {
     throw new Error(`VERITY_EXPLORER_QUERY_SCHEMA: ${path} variables must be an object`);
   }
-  return { query: query.query, variables: (query.variables ?? {}) as Readonly<Record<string, unknown>> };
+  if (query.format !== undefined && query.format !== "verity-v1" && query.format !== "agent0-v1") {
+    throw new Error(`VERITY_EXPLORER_QUERY_SCHEMA: ${path} format must be verity-v1 or agent0-v1`);
+  }
+  return {
+    query: query.query,
+    variables: (query.variables ?? {}) as Readonly<Record<string, unknown>>,
+    ...(query.format === undefined ? {} : { format: query.format })
+  };
 }

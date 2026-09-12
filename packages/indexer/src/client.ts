@@ -1,6 +1,7 @@
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
 import type { Network, PaymentRequired, PaymentRequirements } from "@x402/core/types";
 import { Blocky402Client, discoverHederaCapability } from "@verity/hedera";
+import { normalizeAgent0Id, parseAgent0Provider } from "./agent0.js";
 
 export interface ProviderReputation {
   readonly agentId: string;
@@ -18,6 +19,7 @@ export interface BuyerReputation {
 export interface ReputationQuery {
   readonly query: string;
   readonly variables: Readonly<Record<string, unknown>>;
+  readonly format?: "verity-v1" | "agent0-v1";
 }
 
 export interface ReputationClient {
@@ -41,8 +43,11 @@ export class GraphReputationClient implements ReputationClient {
   ) {}
 
   public async provider(agentId: string): Promise<ProviderReputation> {
-    const body = await this.execute(this.queries.provider, { agentId });
-    return parseProvider(body, agentId);
+    const queryAgentId = this.queries.provider.format === "agent0-v1" ? normalizeAgent0Id(agentId) : agentId;
+    const body = await this.execute(this.queries.provider, { agentId: queryAgentId });
+    return this.queries.provider.format === "agent0-v1"
+      ? parseAgent0Provider(body, queryAgentId)
+      : parseProvider(body, agentId);
   }
 
   public async buyer(root: string): Promise<BuyerReputation> {

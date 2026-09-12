@@ -64,7 +64,14 @@ async function readQueryFile(path: string): Promise<ReputationQuery> {
   }
   const variables = value.variables ?? {};
   if (!isRecord(variables)) throw new Error(`VERITY_MCP_QUERY_FILE_SCHEMA: ${path}.variables must be an object`);
-  return { query: value.query, variables };
+  if (value.format !== undefined && value.format !== "verity-v1" && value.format !== "agent0-v1") {
+    throw new Error(`VERITY_MCP_QUERY_FILE_SCHEMA: ${path}.format must be verity-v1 or agent0-v1`);
+  }
+  return {
+    query: value.query,
+    variables,
+    ...(value.format === undefined ? {} : { format: value.format })
+  };
 }
 
 function writeMessage(value: unknown): void {

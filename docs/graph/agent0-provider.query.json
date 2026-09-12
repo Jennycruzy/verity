@@ -1,0 +1,5 @@
+{
+  "format": "agent0-v1",
+  "query": "query VerityAgent0Provider($agentId: ID!) { agent(id: $agentId) { id registrationFile { webEndpoint } feedback(where: { tag1: \"verity-provider\", isRevoked: false }, orderBy: createdAt, orderDirection: asc) { value tag1 isRevoked endpoint } } }",
+  "variables": {}
+}
