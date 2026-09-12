@@ -1,0 +1,5 @@
+*.spkg
+build/
+generated/
+node_modules/
+

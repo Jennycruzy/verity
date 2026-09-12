@@ -1,0 +1,21 @@
+specVersion: v0.1.0
+package:
+  name: verity_agent_feedback
+  version: v0.1.0
+
+# The first hosted Graph deployment uses Base Sepolia because Agent0 has a
+# published ERC-8004 deployment there. Hedera settlement records remain the
+# source of truth for payment and dispute state.
+network: base-sepolia
+
+imports:
+  ethereum_common: https://spkg.io/v1/packages/ethereum-common/v0.3.3
+
+modules:
+  - name: feedback_events
+    use: ethereum_common:filtered_events
+    initialBlock: 0
+
+params:
+  feedback_events: evt_sig:0x6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc
+
