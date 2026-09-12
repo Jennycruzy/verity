@@ -7,11 +7,11 @@ export interface ContractDeploymentResult {
 
 export async function deployVerityEscrow(
   client: Client,
-  bytecode: Uint8Array,
+  bytecode: string,
   minimumBond: number,
   gas: number
 ): Promise<ContractDeploymentResult> {
-  if (bytecode.length === 0) throw new Error("VERITY_CONTRACT_BYTECODE_EMPTY: compile the escrow contract before deployment");
+  const normalizedBytecode = normalizeBytecode(bytecode);
   if (!Number.isSafeInteger(minimumBond) || minimumBond <= 0) {
     throw new Error("VERITY_CONTRACT_MINIMUM_BOND_INVALID: use a positive safe integer in the asset's smallest unit");
   }
@@ -20,7 +20,7 @@ export async function deployVerityEscrow(
   }
 
   const response = await new ContractCreateFlow()
-    .setBytecode(bytecode)
+    .setBytecode(normalizedBytecode)
     .setGas(gas)
     .setConstructorParameters(new ContractFunctionParameters().addUint256(minimumBond))
     .setContractMemo("verity/bond-escrow/v1")
@@ -30,4 +30,15 @@ export async function deployVerityEscrow(
     throw new Error("VERITY_CONTRACT_DEPLOY_FAILED: deployment returned no contract ID");
   }
   return { contractId: receipt.contractId.toString(), transactionId: response.transactionId.toString() };
+}
+
+function normalizeBytecode(value: string): string {
+  const normalized = value.startsWith("0x") ? value.slice(2) : value;
+  if (normalized.length === 0) {
+    throw new Error("VERITY_CONTRACT_BYTECODE_EMPTY: compile the escrow contract before deployment");
+  }
+  if (normalized.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(normalized)) {
+    throw new Error("VERITY_CONTRACT_BYTECODE_INVALID: bytecode must be an even-length hexadecimal string");
+  }
+  return normalized.toLowerCase();
 }
