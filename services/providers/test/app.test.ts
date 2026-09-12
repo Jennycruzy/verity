@@ -69,7 +69,7 @@ test("serves the configured ERC-8004 registration document", async () => {
     name: "Verity fx provider",
     description: "An objectively verifiable foreign-exchange rate service.",
     services: [
-      { name: "x402-resource", endpoint: "https://provider.invalid/fx", version: "1" },
+      { name: "web", endpoint: "https://provider.invalid/fx", version: "1" },
       { name: "cross-checker", endpoint: "https://provider.invalid/check", version: "1" },
       { name: "agent-registration", endpoint: "https://provider.invalid/.well-known/agent-registration.json", version: "1" }
     ],

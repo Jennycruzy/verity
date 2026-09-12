@@ -62,6 +62,7 @@ test("creates a self-contained registration URI bound to its agent identity", ()
   const registration = parseErc8004AgentDataUri(uri);
   assert.equal(registration.registrations[0]?.agentRegistry, registry);
   assert.equal(registration.registrations[0]?.agentId, "7");
+  assert.equal(registration.services[0]?.name, "web");
   assert.equal(registration.services[0]?.endpoint, "https://provider.example/api/fx");
   assert.throws(() => parseErc8004AgentDataUri("data:application/json;base64,not-json"), /VERITY_ERC8004_URI_INVALID/);
 });

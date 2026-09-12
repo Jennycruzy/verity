@@ -14,7 +14,7 @@ export function createProviderHandler(config: ProviderServiceConfig) {
     name: `Verity ${config.kind} provider`,
     description: config.kind === "fx" ? "An objectively verifiable foreign-exchange rate service." : "An objectively verifiable entity-resolution service.",
     services: [
-      { name: "x402-resource", endpoint: `${config.erc8004.publicUrl}/${config.kind === "fx" ? "fx" : "entity"}`, version: "1" },
+      { name: "web", endpoint: `${config.erc8004.publicUrl}/${config.kind === "fx" ? "fx" : "entity"}`, version: "1" },
       { name: "cross-checker", endpoint: `${config.erc8004.publicUrl}/check`, version: "1" },
       { name: "agent-registration", endpoint: `${config.erc8004.publicUrl}/.well-known/agent-registration.json`, version: "1" }
     ],

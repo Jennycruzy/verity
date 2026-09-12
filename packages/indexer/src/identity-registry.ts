@@ -58,7 +58,7 @@ export function createErc8004AgentDataUri(input: Erc8004RegistrationFileInput): 
     name: input.name,
     description: input.description,
     services: [
-      { name: "x402-resource", endpoint: appendPath(input.publicUrl, input.kind === "fx" ? "fx" : "entity"), version: "1" },
+      { name: "web", endpoint: appendPath(input.publicUrl, input.kind === "fx" ? "fx" : "entity"), version: "1" },
       { name: "cross-checker", endpoint: appendPath(input.publicUrl, "check"), version: "1" },
       { name: "agent-registration", endpoint: appendPath(input.publicUrl, ".well-known/agent-registration.json"), version: "1" }
     ],
