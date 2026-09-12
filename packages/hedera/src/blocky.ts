@@ -35,6 +35,11 @@ type FetchLike = typeof fetch;
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error("VERITY_FACILITATOR_URL_EMPTY: set BLOCKY402_URL");
+  if (!URL.canParse(trimmed)) throw new Error("VERITY_FACILITATOR_URL_INVALID: use an absolute HTTP(S) URL");
+  const parsed = new URL(trimmed);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("VERITY_FACILITATOR_URL_INVALID: use an absolute HTTP(S) URL");
+  }
   return trimmed.replace(/\/$/, "");
 }
 
@@ -46,6 +51,9 @@ export class Blocky402Client {
   public constructor(baseUrl: string, options: { requestTimeoutMs?: number; fetchImpl?: FetchLike } = {}) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
+    if (!Number.isSafeInteger(this.requestTimeoutMs) || this.requestTimeoutMs <= 0) {
+      throw new Error("VERITY_FACILITATOR_TIMEOUT_INVALID: requestTimeoutMs must be a positive integer");
+    }
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -130,9 +138,32 @@ export async function discoverHederaCapability(client: Blocky402Client, network:
 }
 
 function isSupportedResponse(value: unknown): value is SupportedResponse {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Partial<SupportedResponse>;
-  return Array.isArray(candidate.kinds) && typeof candidate.signers === "object" && candidate.signers !== null;
+  return Array.isArray(candidate.kinds)
+    && candidate.kinds.every(isSupportedKind)
+    && typeof candidate.signers === "object"
+    && candidate.signers !== null
+    && !Array.isArray(candidate.signers)
+    && Object.values(candidate.signers).every((entries) => Array.isArray(entries) && entries.every((entry) => typeof entry === "string" && entry.trim().length > 0));
+}
+
+function isSupportedKind(value: unknown): value is SupportedKind {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Partial<SupportedKind>;
+  return typeof candidate.x402Version === "number"
+    && Number.isSafeInteger(candidate.x402Version)
+    && candidate.x402Version > 0
+    && typeof candidate.scheme === "string"
+    && candidate.scheme.trim().length > 0
+    && typeof candidate.network === "string"
+    && candidate.network.trim().length > 0
+    && (candidate.extra === undefined || isStringRecord(candidate.extra));
+}
+
+function isStringRecord(value: unknown): value is Readonly<Record<string, string>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every((entry) => typeof entry === "string" && entry.trim().length > 0);
 }
 
 function isVerificationResult(value: unknown): value is VerificationResult {

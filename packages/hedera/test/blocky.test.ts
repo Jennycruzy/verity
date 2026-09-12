@@ -47,3 +47,20 @@ test("sends the v2 envelope to verify", async () => {
     paymentRequirements: { scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 30, asset: "0.0.0", extra: {} }
   });
 });
+
+test("rejects invalid facilitator URL and timeout configuration", () => {
+  assert.throws(() => new Blocky402Client("facilitator.invalid"), /VERITY_FACILITATOR_URL_INVALID/);
+  assert.throws(() => new Blocky402Client("file:///facilitator"), /VERITY_FACILITATOR_URL_INVALID/);
+  assert.throws(() => new Blocky402Client("https://facilitator.invalid", { requestTimeoutMs: 0 }), /VERITY_FACILITATOR_TIMEOUT_INVALID/);
+});
+
+test("rejects malformed supported signer data", async () => {
+  const client = new Blocky402Client("https://facilitator.invalid", {
+    fetchImpl: async () => new Response(JSON.stringify({
+      kinds: [{ x402Version: 2, scheme: "exact", network: "hedera:testnet" }],
+      extensions: [],
+      signers: { "hedera:*": "0.0.999" }
+    }), { status: 200 })
+  });
+  await assert.rejects(client.supported(), /VERITY_FACILITATOR_SCHEMA/);
+});
