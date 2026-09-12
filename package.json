@@ -16,6 +16,7 @@
     "discover": "tsx scripts/discover-capabilities.ts",
     "check:config": "tsx scripts/check-config.ts",
     "graph:mcp": "tsx scripts/verity-mcp.ts",
+    "provision:accounts": "tsx scripts/provision-accounts.ts",
     "provision:topics": "tsx scripts/provision-topics.ts",
     "provision:token": "tsx scripts/provision-token.ts",
     "register:provider": "tsx scripts/register-provider.ts",

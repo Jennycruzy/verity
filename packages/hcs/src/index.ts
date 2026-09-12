@@ -1,4 +1,5 @@
 export * from "./codec.js";
+export * from "./accounts.js";
 export * from "./contract.js";
 export * from "./escrow.js";
 export * from "./mirror.js";
