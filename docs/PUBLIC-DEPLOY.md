@@ -78,6 +78,12 @@ done
 curl --include "https://fx.<domain>/fx"
 ```
 
+From the buyer checkout on a machine with the deployment domain in `.env`, the same check is reproducible with:
+
+```sh
+npm run public:check
+```
+
 The last request must return `402` and include a `payment-required` header. The service must not return a successful provider body before the x402 payment is verified.
 
 ## 4. Run the real flows
