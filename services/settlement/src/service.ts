@@ -76,6 +76,10 @@ export class SettlementCoordinator {
     return this.runIdempotently(this.adjudications, request.disputeId, request, () => this.recordAdjudicationInternal(request));
   }
 
+  public close(): void {
+    this.hcs.close?.();
+  }
+
   private async settleAcceptedInternal(request: SettlementRequest): Promise<SettlementOutcome> {
     await this.validatePaymentCapability(request.paymentRequirements);
     let state = transition("created", "verified");

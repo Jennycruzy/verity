@@ -3,10 +3,15 @@ import { encodeHcsRecord, type HcsRecord } from "./codec.js";
 
 export interface HcsPublisher {
   publish<TPayload extends Record<string, unknown>>(topicId: string, record: HcsRecord<TPayload>): Promise<string>;
+  close?(): void;
 }
 
 export class HederaHcsPublisher implements HcsPublisher {
   public constructor(private readonly client: Client) {}
+
+  public close(): void {
+    this.client.close();
+  }
 
   public async publish<TPayload extends Record<string, unknown>>(topicId: string, record: HcsRecord<TPayload>): Promise<string> {
     const message = encodeHcsRecord(record);

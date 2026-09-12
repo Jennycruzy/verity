@@ -91,6 +91,17 @@ test("rejects a changed retry for an already settled request", async () => {
   assert.equal(facilitator.settleCalls, 1);
 });
 
+test("closes an owned HCS publisher when the coordinator shuts down", () => {
+  let closed = false;
+  const coordinator = new SettlementCoordinator(
+    new FacilitatorForTest("https://facilitator.invalid"),
+    { publish: async () => "0.0.7@2.000000000", close: () => { closed = true; } },
+    { settlement: "0.0.7", dispute: "0.0.8" }
+  );
+  coordinator.close();
+  assert.equal(closed, true);
+});
+
 function disputeRequest(verdict: "accept" | "reject") {
   return {
     requestId: "request-dispute",

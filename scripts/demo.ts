@@ -11,35 +11,38 @@ const providerId = required("VERITY_DEMO_PROVIDER_ID");
 const buyerId = required("VERITY_DEMO_BUYER_ROOT");
 const requestId = randomUUID();
 const coordinator = createSettlementCoordinator();
-const demoIdentityProof = optionalJsonObject("VERITY_DEMO_IDENTITY_PROOF_JSON");
-const demoProviderResponses = optionalJsonReferences("VERITY_DEMO_PROVIDER_RESPONSES_JSON");
+try {
+  const demoIdentityProof = optionalJsonObject("VERITY_DEMO_IDENTITY_PROOF_JSON");
+  const demoProviderResponses = optionalJsonReferences("VERITY_DEMO_PROVIDER_RESPONSES_JSON");
+  const result = await buy(url, {
+    evaluate: (value: unknown) => evaluateDemoValue(rule, value),
+    evaluationInput: (value: unknown) => demoEvaluationInput(rule, value),
+    maxPrice: process.env.VERITY_DEMO_MAX_PRICE,
+    bond: process.env.VERITY_DEMO_BOND,
+    disputeUrl: process.env.VERITY_DISPUTE_URL,
+    requestId,
+    ...(process.env.VERITY_DEMO_PROVIDER_ROOT?.trim() ? { providerRoot: process.env.VERITY_DEMO_PROVIDER_ROOT.trim() } : {}),
+    ...(demoIdentityProof ? { identityProof: demoIdentityProof, identitySignal: required("VERITY_DEMO_IDENTITY_SIGNAL") } : {}),
+    ...(demoProviderResponses ? { providerResponses: demoProviderResponses } : {}),
+    settle: async (paymentPayload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> => {
+      const outcome = await coordinator.settleAccepted({
+        requestId,
+        providerId,
+        buyerId,
+        ruleId: rule === "fx-rate-v1" ? "fx-rate-v1" : "entity-canonical-v1",
+        paymentPayload,
+        paymentRequirements: requirements
+      });
+      if (!outcome.transactionId) throw new Error("VERITY_DEMO_TRANSACTION_MISSING: settlement coordinator returned no transaction ID");
+      console.log(JSON.stringify({ requestId, hcsTransactionId: outcome.hcsTransactionId }));
+      return { success: true, transaction: outcome.transactionId, network: requirements.network };
+    }
+  });
 
-const result = await buy(url, {
-  evaluate: (value: unknown) => evaluateDemoValue(rule, value),
-  evaluationInput: (value: unknown) => demoEvaluationInput(rule, value),
-  maxPrice: process.env.VERITY_DEMO_MAX_PRICE,
-  bond: process.env.VERITY_DEMO_BOND,
-  disputeUrl: process.env.VERITY_DISPUTE_URL,
-  requestId,
-  ...(process.env.VERITY_DEMO_PROVIDER_ROOT?.trim() ? { providerRoot: process.env.VERITY_DEMO_PROVIDER_ROOT.trim() } : {}),
-  ...(demoIdentityProof ? { identityProof: demoIdentityProof, identitySignal: required("VERITY_DEMO_IDENTITY_SIGNAL") } : {}),
-  ...(demoProviderResponses ? { providerResponses: demoProviderResponses } : {}),
-  settle: async (paymentPayload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> => {
-    const outcome = await coordinator.settleAccepted({
-      requestId,
-      providerId,
-      buyerId,
-      ruleId: rule === "fx-rate-v1" ? "fx-rate-v1" : "entity-canonical-v1",
-      paymentPayload,
-      paymentRequirements: requirements
-    });
-    if (!outcome.transactionId) throw new Error("VERITY_DEMO_TRANSACTION_MISSING: settlement coordinator returned no transaction ID");
-    console.log(JSON.stringify({ requestId, hcsTransactionId: outcome.hcsTransactionId }));
-    return { success: true, transaction: outcome.transactionId, network: requirements.network };
-  }
-});
-
-console.log(JSON.stringify({ requestId, verdict: result.verdict, settlement: result.settlement, dispute: result.dispute }, null, 2));
+  console.log(JSON.stringify({ requestId, verdict: result.verdict, settlement: result.settlement, dispute: result.dispute }, null, 2));
+} finally {
+  coordinator.close();
+}
 
 function evaluateDemoValue(ruleId: string, value: unknown): DeterministicVerdict {
   if (ruleId === "fx-rate-v1") return evaluateFxRate(demoFxInput(value));
