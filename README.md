@@ -154,13 +154,13 @@ The deploy command writes the returned Hedera contract ID to `VERITY_ESCROW_CONT
 
 ```sh
 npm run register:provider
-npm run stake:provider
 npm run register:agent
+npm run stake:provider
 ```
 
 `register:provider` forwards the complete IDKit result to `WORLD_ID_VERIFY_URL`, checks the proof signal against `VERITY_PROVIDER_IDENTITY_SIGNAL`, and writes the verified root to `VERITY_PROVIDER_ROOT`. Use the same `WORLD_ID_DISPUTE_ACTION` for provider registration and disputes so the root is comparable across both roles. The provider proof JSON and signal are local inputs and are never written to HCS.
 
-The script publishes a compact `provider` record to the settlement HCS topic containing `providerId`, the verified human root, the staked amount, the provider EVM address, and the stake transaction ID. It also writes the same data to `VERITY_PROVIDER_REGISTRY_FILE` as an operator cache. The dispute service reads eligibility from Mirror Node and does not depend on that cache; a provider record is not accepted unless all four eligibility values validate.
+The script publishes a compact `provider` record to the settlement HCS topic containing `providerId`, the verified human root, the staked amount, the provider EVM address, and the stake transaction ID. It also writes the same data to `VERITY_PROVIDER_REGISTRY_FILE` as an operator cache. The dispute service reads eligibility from Mirror Node and does not depend on that cache; it replays the recorded `stakeProvider` call and refuses a provider record unless the contract, caller, amount, root, and successful transaction all match.
 
 `register:agent` normalizes the ERC-8004 registry reference, anchors the provider's human root and public endpoint in the escrow contract's `AgentRegistered` event, and writes the Hedera transaction ID to `VERITY_PROVIDER_AGENT_REGISTRATION_TX`. The contract rejects a second registration for the same normalized agent reference.
 
