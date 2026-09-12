@@ -133,16 +133,18 @@ PROVIDER_KIND=fx PORT=3103 npm --workspace @verity/providers start
 
 The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker endpoint is `POST /check` with `{ "ruleId": "...", "value": { ... } }`. The provider process validates inputs and returns the same deterministic verdict used by the buyer.
 
+The quorum can include the separate Go implementation in `services/checker-go`, which does not import the Node provider or Verity rule package. Configure `CHECKER_PORT`, `CHECKER_ID`, and `CHECKER_MAX_BODY_BYTES`, then run `npm run checker:go`. Its `/check` endpoint uses exact rational arithmetic for `fx-rate-v1` and returns the same published verdict schema.
+
 When `VERITY_PROVIDER_PUBLIC_URL`, `VERITY_ERC8004_REGISTRY`, and `VERITY_ERC8004_AGENT_ID` are set, the provider also serves `GET /.well-known/agent-registration.json` with its x402 resource, checker, and registry references.
 
 The reusable agent skill is in `skills/verity-reputation/SKILL.md`. With a live Graph endpoint and query files configured, `npm run graph:mcp` exposes provider reliability and buyer honesty as MCP tools. The Graph transport requires an x402 challenge and settles the query before returning data.
 
 With the same Graph configuration, start the public explorer with `npm --workspace @verity/explorer start`. Open `http://127.0.0.1:8787/` to query provider reliability or buyer honesty. The browser page and JSON routes both call `GraphReputationClient`; there is no parallel local reputation database.
 
-The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the settlement HCS topic, and the Mirror Node URL. It loads provider eligibility from `provider` records on that topic; the local provider JSON is only an operator cache. For three local FX checker processes, set:
+The dispute service requires three or another odd number of checker URLs, a deployed escrow contract, a World ID verification URL/action, the settlement HCS topic, and the Mirror Node URL. It loads provider eligibility from `provider` records on that topic; the local provider JSON is only an operator cache. A local FX quorum can combine two independently started Node checkers with the separate Go checker:
 
 ```sh
-DISPUTE_CHECKERS_JSON='[{"id":"fx-a","url":"http://127.0.0.1:3101/check"},{"id":"fx-b","url":"http://127.0.0.1:3102/check"},{"id":"fx-c","url":"http://127.0.0.1:3103/check"}]'
+DISPUTE_CHECKERS_JSON='[{"id":"fx-node-a","url":"http://127.0.0.1:3101/check"},{"id":"fx-node-b","url":"http://127.0.0.1:3103/check"},{"id":"fx-independent-go","url":"http://127.0.0.1:3201/check"}]'
 npm run disputes:start
 ```
 
@@ -233,6 +235,7 @@ The resource server delivers before settlement, so the payment hold must survive
 | Capability | Evidence in this repository | Current status |
 | --- | --- | --- |
 | Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; honest FX request settled on testnet with linked evidence |
+| Independent checker implementation | `services/checker-go/main.go:1` | Go checker tested independently and verified over live local HTTP |
 | HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; settlement and dispute topics live on testnet |
 | Mirror Node replay | `packages/replay/src/index.ts:1` | Implemented and tested |
 | Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed on testnet; provider stake remains to be posted |
