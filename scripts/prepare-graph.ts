@@ -3,7 +3,8 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { getAddress, JsonRpcProvider } from "ethers";
+import { JsonRpcProvider } from "ethers";
+import { resolveErc8004EvmRegistry } from "@verity/indexer";
 
 const execFileAsync = promisify(execFile);
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
@@ -24,13 +25,15 @@ if (network !== "base-sepolia") {
 }
 
 const rpcUrl = requiredUrl("GRAPH_FEEDBACK_RPC_URL");
-const identityRegistry = requiredAddress("GRAPH_FEEDBACK_IDENTITY_REGISTRY");
-const reputationRegistry = requiredAddress("GRAPH_FEEDBACK_REPUTATION_REGISTRY");
+const identityRegistryInput = required("GRAPH_FEEDBACK_IDENTITY_REGISTRY");
+const reputationRegistryInput = required("GRAPH_FEEDBACK_REPUTATION_REGISTRY");
 const startBlock = optionalDecimal("GRAPH_SUBSTREAM_START_BLOCK") ?? "0";
 const provider = new JsonRpcProvider(rpcUrl, undefined, { staticNetwork: false });
 
 try {
   const chain = await provider.getNetwork();
+  const identityRegistry = resolveErc8004EvmRegistry(identityRegistryInput, chain.chainId).address;
+  const reputationRegistry = resolveErc8004EvmRegistry(reputationRegistryInput, chain.chainId).address;
   const identityCode = await provider.getCode(identityRegistry);
   const reputationCode = await provider.getCode(reputationRegistry);
   if (identityCode === "0x") {
@@ -98,15 +101,6 @@ function requiredUrl(name: string): string {
     throw new Error(`VERITY_CONFIG_INVALID: ${name} must use HTTP(S)`);
   }
   return url.toString();
-}
-
-function requiredAddress(name: string): string {
-  const value = required(name);
-  try {
-    return getAddress(value);
-  } catch (error) {
-    throw new Error(`VERITY_CONFIG_INVALID: ${name} must be a 20-byte EVM address`, { cause: error });
-  }
 }
 
 function optionalDecimal(name: string): string | undefined {

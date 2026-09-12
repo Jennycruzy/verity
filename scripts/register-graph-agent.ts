@@ -1,12 +1,12 @@
 import { config as loadDotenv } from "dotenv";
+import { JsonRpcProvider } from "ethers";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   createErc8004Registration,
   Erc8004IdentityRegistryClient,
   normalizeErc8004AgentId,
-  normalizeErc8004Registry,
-  parseErc8004EvmRegistry
+  resolveErc8004EvmRegistry
 } from "@verity/indexer";
 
 loadDotenv({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
@@ -31,8 +31,8 @@ const fields = role === "provider"
   };
 
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
-const provider = parseErc8004EvmRegistry(required("GRAPH_FEEDBACK_IDENTITY_REGISTRY"));
 const rpcUrl = requiredUrl("GRAPH_FEEDBACK_RPC_URL");
+const provider = await resolveRegistry(rpcUrl, required("GRAPH_FEEDBACK_IDENTITY_REGISTRY"));
 const endpoint = requiredUrl(fields.endpoint);
 const privateKey = required(fields.privateKey);
 const existingAgentId = optional(fields.agentId);
@@ -130,6 +130,16 @@ function requiredUrl(name: string): string {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`VERITY_CONFIG_INVALID: ${name} must use HTTP(S)`);
   return url.toString();
+}
+
+async function resolveRegistry(rpcUrl: string, value: string) {
+  const rpc = new JsonRpcProvider(rpcUrl, undefined, { staticNetwork: false });
+  try {
+    const network = await rpc.getNetwork();
+    return resolveErc8004EvmRegistry(value, network.chainId);
+  } finally {
+    rpc.destroy();
+  }
 }
 
 function optional(name: string): string | undefined {

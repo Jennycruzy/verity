@@ -1,8 +1,9 @@
 import { config as loadDotenv } from "dotenv";
-import { keccak256, toUtf8Bytes } from "ethers";
+import { JsonRpcProvider, keccak256, toUtf8Bytes } from "ethers";
 import { readTopicRecords, normalizeMirrorNodeBaseUrl } from "@verity/hcs";
 import {
   Erc8004ReputationRegistryClient,
+  resolveErc8004EvmRegistry,
   type Erc8004FeedbackTransaction
 } from "@verity/indexer";
 import { stableJson, RULE_IDS, type RuleId, type Verdict } from "@verity/types";
@@ -30,14 +31,24 @@ async function publish(disputeId: string): Promise<void> {
   const dispute = parseDispute(record.payload, disputeId);
 
   const rpcUrl = required("GRAPH_FEEDBACK_RPC_URL");
-  const identityRegistry = required("GRAPH_FEEDBACK_IDENTITY_REGISTRY");
-  const reputationRegistry = required("GRAPH_FEEDBACK_REPUTATION_REGISTRY");
+  const identityRegistryInput = required("GRAPH_FEEDBACK_IDENTITY_REGISTRY");
+  const reputationRegistryInput = required("GRAPH_FEEDBACK_REPUTATION_REGISTRY");
   const providerAgentId = required("GRAPH_FEEDBACK_PROVIDER_AGENT_ID");
   const buyerAgentId = required("GRAPH_FEEDBACK_BUYER_AGENT_ID");
   const buyerSignerKey = required("GRAPH_FEEDBACK_BUYER_PRIVATE_KEY");
   const providerSignerKey = required("GRAPH_FEEDBACK_PROVIDER_PRIVATE_KEY");
   const providerEndpoint = required("GRAPH_FEEDBACK_PROVIDER_ENDPOINT");
   const buyerEndpoint = optional("GRAPH_FEEDBACK_BUYER_ENDPOINT");
+  const registryRpc = new JsonRpcProvider(rpcUrl, undefined, { staticNetwork: false });
+  let identityRegistry: string;
+  let reputationRegistry: string;
+  try {
+    const network = await registryRpc.getNetwork();
+    identityRegistry = resolveErc8004EvmRegistry(identityRegistryInput, network.chainId).reference;
+    reputationRegistry = resolveErc8004EvmRegistry(reputationRegistryInput, network.chainId).reference;
+  } finally {
+    registryRpc.destroy();
+  }
 
   let buyerClient: Erc8004ReputationRegistryClient | undefined;
   let providerClient: Erc8004ReputationRegistryClient | undefined;

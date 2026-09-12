@@ -60,6 +60,8 @@ WORLD_ID_DISPUTE_ACTION=<configured-world-action>
 
 Copy the Hedera account credentials and the already-provisioned topic/contract values from the local `.env` only over a secure connection. Do not paste private keys into GitHub, Discord, or this repository. The Graph signer private keys are only needed by the local registration/feedback commands; they do not belong in the public image.
 
+Before registering the two Agent0 identities, run `npm run graph:check-signers`. It prints only the two public addresses and reports whether either needs Base Sepolia ETH. No Hedera top-up is needed for this check.
+
 ## 3. Start and smoke-test
 
 ```sh

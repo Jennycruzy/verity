@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createErc8004Registration, erc8004AgentKey, normalizeErc8004AgentId, normalizeErc8004Registry } from "../src/erc8004.ts";
-import { createErc8004AgentDataUri, parseErc8004AgentDataUri, parseErc8004EvmRegistry } from "../src/identity-registry.ts";
+import { createErc8004AgentDataUri, parseErc8004AgentDataUri, parseErc8004EvmRegistry, resolveErc8004EvmRegistry } from "../src/identity-registry.ts";
 
 test("canonicalizes an ERC-8004 registry and token identity", () => {
   const reference = { agentRegistry: "EIP155:001:0xABC", agentId: "00022" };
@@ -47,6 +47,15 @@ test("parses a live EVM registry reference without changing its chain", () => {
     address: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
   });
   assert.throws(() => parseErc8004EvmRegistry("eip155:296:0xregistry"), /VERITY_ERC8004_REGISTRY_INVALID/);
+});
+
+test("resolves a raw registry address against the discovered chain", () => {
+  assert.deepEqual(resolveErc8004EvmRegistry("0x8004A818BFB912233c491871b3d84c89A494BD9e", 84532n), {
+    reference: "eip155:84532:0x8004a818bfb912233c491871b3d84c89a494bd9e",
+    chainId: "84532",
+    address: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
+  });
+  assert.throws(() => resolveErc8004EvmRegistry("eip155:296:0x8004A818BFB912233c491871b3d84c89A494BD9e", 84532n), /VERITY_ERC8004_CHAIN_MISMATCH/);
 });
 
 test("creates a self-contained registration URI bound to its agent identity", () => {

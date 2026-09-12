@@ -3,7 +3,7 @@ import { Blocky402Client, discoverHederaCapability } from "@verity/hedera";
 import { normalizeMirrorNodeBaseUrl } from "@verity/hcs";
 
 type CheckState = "ready" | "missing" | "invalid" | "unavailable";
-type CheckScope = "first-payment" | "provider" | "dispute" | "audit";
+type CheckScope = "first-payment" | "provider" | "dispute" | "audit" | "graph";
 
 interface ConfigCheck {
   readonly key: string;
@@ -73,7 +73,28 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     required("VERITY_ERC8004_AGENT_ID", "provider", "ERC-8004 agent ID"),
     required("VERITY_ERC8004_RPC_URL", "provider", "EVM JSON-RPC URL for ERC-8004 registration"),
     required("WORLD_ID_VERIFY_URL", "dispute", "World ID verification endpoint"),
-    required("WORLD_ID_DISPUTE_ACTION", "dispute", "World ID dispute action")
+    required("WORLD_ID_DISPUTE_ACTION", "dispute", "World ID dispute action"),
+    required("WORLD_ID_APP_ID", "dispute", "World ID app ID for the public proof service"),
+    required("WORLD_ID_RP_ID", "dispute", "World ID relying-party ID"),
+    required("WORLD_ID_SIGNING_KEY", "dispute", "World ID request-signing key is set locally; value is never printed"),
+    required("GRAPH_SUBGRAPH_URL", "graph", "paid public Graph query endpoint"),
+    required("GRAPH_STUDIO_QUERY_URL", "graph", "hosted Graph Studio query endpoint"),
+    required("GRAPH_GATEWAY_PRICE", "graph", "paid Graph query amount in tinybars"),
+    required("GRAPH_GATEWAY_UPSTREAM_API_KEY", "graph", "server-side hosted Graph credential"),
+    required("GRAPH_PROVIDER_QUERY_FILE", "graph", "Agent0 provider query file"),
+    required("GRAPH_BUYER_QUERY_FILE", "graph", "human-root buyer query file"),
+    required("GRAPH_FEEDBACK_RPC_URL", "graph", "EVM RPC for Agent0 identity and feedback"),
+    required("GRAPH_FEEDBACK_IDENTITY_REGISTRY", "graph", "Agent0 identity registry"),
+    required("GRAPH_FEEDBACK_REPUTATION_REGISTRY", "graph", "Agent0 reputation registry"),
+    required("GRAPH_FEEDBACK_PROVIDER_AGENT_ID", "graph", "registered provider Agent0 identity"),
+    required("GRAPH_FEEDBACK_BUYER_AGENT_ID", "graph", "registered buyer Agent0 identity"),
+    required("GRAPH_FEEDBACK_PROVIDER_PRIVATE_KEY", "graph", "provider feedback signer is set locally; value is never printed"),
+    required("GRAPH_FEEDBACK_BUYER_PRIVATE_KEY", "graph", "buyer feedback signer is set locally; value is never printed"),
+    required("GRAPH_FEEDBACK_PROVIDER_ENDPOINT", "graph", "provider endpoint recorded in Agent0 feedback"),
+    required("GRAPH_ROUTE_CANDIDATES_JSON", "graph", "provider candidates used by reputation routing"),
+    required("GRAPH_STUDIO_SUBGRAPH", "graph", "Graph Studio subgraph name"),
+    required("GRAPH_STUDIO_DEPLOY_KEY", "graph", "Graph Studio deploy key is set locally; value is never printed"),
+    required("GRAPH_STUDIO_VERSION_LABEL", "graph", "Graph Studio deployment version label")
   ];
 
   const contractId = env.VERITY_ESCROW_CONTRACT_ID?.trim();
@@ -109,6 +130,45 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
       state: "invalid",
       scope: "provider",
       detail: "set all three identity registration values together"
+    });
+  }
+
+  const worldFields = [
+    env.WORLD_ID_APP_ID?.trim(),
+    env.WORLD_ID_RP_ID?.trim(),
+    env.WORLD_ID_SIGNING_KEY?.trim(),
+    env.WORLD_ID_VERIFY_URL?.trim(),
+    env.WORLD_ID_DISPUTE_ACTION?.trim()
+  ].filter(Boolean).length;
+  if (worldFields !== 0 && worldFields !== 5) {
+    checks.push({
+      key: "WORLD_ID_APP_ID + WORLD_ID_RP_ID + WORLD_ID_SIGNING_KEY + WORLD_ID_VERIFY_URL + WORLD_ID_DISPUTE_ACTION",
+      state: "invalid",
+      scope: "dispute",
+      detail: "set all World ID service values together"
+    });
+  }
+
+  const graphSignerFields = [
+    env.GRAPH_FEEDBACK_PROVIDER_PRIVATE_KEY?.trim(),
+    env.GRAPH_FEEDBACK_BUYER_PRIVATE_KEY?.trim()
+  ].filter(Boolean).length;
+  if (graphSignerFields !== 0 && graphSignerFields !== 2) {
+    checks.push({
+      key: "GRAPH_FEEDBACK_PROVIDER_PRIVATE_KEY + GRAPH_FEEDBACK_BUYER_PRIVATE_KEY",
+      state: "invalid",
+      scope: "graph",
+      detail: "use two separate feedback signer keys"
+    });
+  }
+
+  const graphUrls = [env.GRAPH_SUBGRAPH_URL?.trim(), env.GRAPH_STUDIO_QUERY_URL?.trim()].filter(Boolean);
+  if (graphUrls.length === 2 && graphUrls[0] === graphUrls[1]) {
+    checks.push({
+      key: "GRAPH_SUBGRAPH_URL",
+      state: "invalid",
+      scope: "graph",
+      detail: "point the buying agent at the paid gateway URL, not directly at the Studio upstream"
     });
   }
 

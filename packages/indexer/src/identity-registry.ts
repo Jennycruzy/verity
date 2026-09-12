@@ -53,6 +53,24 @@ export function parseErc8004EvmRegistry(value: string): Erc8004EvmRegistry {
   return { reference, chainId, address: getAddress(address) };
 }
 
+export function resolveErc8004EvmRegistry(value: string, chainId: bigint | string): Erc8004EvmRegistry {
+  const normalizedChainId = BigInt(chainId).toString(10);
+  const normalized = value.trim();
+  if (/^0x[0-9a-fA-F]{40}$/.test(normalized)) {
+    const address = getAddress(normalized);
+    return {
+      reference: normalizeErc8004Registry(`eip155:${normalizedChainId}:${address}`),
+      chainId: normalizedChainId,
+      address
+    };
+  }
+  const parsed = parseErc8004EvmRegistry(normalized);
+  if (parsed.chainId !== normalizedChainId) {
+    throw new Error(`VERITY_ERC8004_CHAIN_MISMATCH: registry expects eip155:${parsed.chainId}, RPC reported eip155:${normalizedChainId}`);
+  }
+  return parsed;
+}
+
 export function createErc8004AgentDataUri(input: Erc8004RegistrationFileInput): string {
   const registration = createErc8004Registration({
     name: input.name,

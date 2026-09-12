@@ -17,6 +17,7 @@
     "check:config": "tsx scripts/check-config.ts",
     "graph:mcp": "tsx scripts/verity-mcp.ts",
     "graph:route": "tsx scripts/route-demo.ts",
+    "graph:check-signers": "tsx scripts/check-graph-signers.ts",
     "public:check": "tsx scripts/public-smoke.ts",
     "provision:accounts": "tsx scripts/provision-accounts.ts",
     "provision:topics": "tsx scripts/provision-topics.ts",
@@ -45,7 +46,8 @@
   "dependencies": {
     "@x402/core": "2.25.0",
     "@x402/hedera": "2.25.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "ethers": "6.16.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
