@@ -43,7 +43,15 @@ export async function createEcdsaAccount(client: Client, initialBalance: string,
   return {
     accountId,
     privateKey: privateKey.toStringRaw(),
-    evmAddress: privateKey.publicKey.toEvmAddress(),
+    evmAddress: normalizeEvmAddress(privateKey.publicKey.toEvmAddress()),
     transactionId: response.transactionId.toString()
   };
+}
+
+function normalizeEvmAddress(value: string): string {
+  const normalized = value.startsWith("0x") ? value : `0x${value}`;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(normalized)) {
+    throw new Error("VERITY_ACCOUNT_EVM_ADDRESS_INVALID: generated key did not produce a 20-byte EVM address");
+  }
+  return normalized;
 }
