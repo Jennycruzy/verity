@@ -41,14 +41,18 @@ const STAKE_PROVIDER_SELECTOR = STAKE_PROVIDER_INTERFACE.getFunction("stakeProvi
 
 export class MirrorBondVerifier implements BondVerifier {
   private readonly baseUrl: string;
+  private readonly escrowContractId: string;
 
   public constructor(
     mirrorNodeBaseUrl: string,
-    private readonly escrowContractId: string,
+    escrowContractId: string,
     private readonly fetchImpl: typeof fetch = fetch
   ) {
     const normalized = normalizeMirrorNodeBaseUrl(mirrorNodeBaseUrl);
-    if (!escrowContractId.trim()) throw new Error("VERITY_ESCROW_CONTRACT_ID_MISSING: set the deployed escrow contract ID");
+    const normalizedContractId = escrowContractId.trim();
+    if (!normalizedContractId) throw new Error("VERITY_ESCROW_CONTRACT_ID_MISSING: set the deployed escrow contract ID");
+    if (!/^0\.0\.\d+$/.test(normalizedContractId)) throw new Error("VERITY_ESCROW_CONTRACT_ID_INVALID: use a Hedera contract ID in 0.0.N format");
+    this.escrowContractId = normalizedContractId;
     this.baseUrl = normalized;
   }
 

@@ -50,6 +50,10 @@ test("normalizes the Hedera transaction ID accepted by Mirror Node", () => {
   assert.throws(() => toMirrorTransactionId("not-a-transaction"), /VERITY_BOND_TRANSACTION_ID_INVALID/);
 });
 
+test("rejects a malformed escrow contract ID before reading Mirror Node", () => {
+  assert.throws(() => new MirrorBondVerifier("https://mirror.invalid", "contract"), /VERITY_ESCROW_CONTRACT_ID_INVALID/);
+});
+
 test("adds the Mirror Node API path when the root URL is configured", async () => {
   const verifier = new MirrorBondVerifier("https://mirror.invalid", contractId, async (input) => {
     assert.equal(String(input), "https://mirror.invalid/api/v1/contracts/results/0.0.9-1-000000000");

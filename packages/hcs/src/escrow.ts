@@ -19,12 +19,17 @@ export interface EscrowScheduler {
 }
 
 export class HederaEscrowExecutor implements EscrowExecutor, EscrowScheduler {
+  private readonly contractId: string;
+
   public constructor(
     private readonly client: Client,
-    private readonly contractId: string,
+    contractId: string,
     private readonly gas: number
   ) {
-    if (!contractId.trim()) throw new Error("VERITY_ESCROW_CONTRACT_ID_MISSING: set the deployed contract ID");
+    const normalizedContractId = contractId.trim();
+    if (!normalizedContractId) throw new Error("VERITY_ESCROW_CONTRACT_ID_MISSING: set the deployed contract ID");
+    if (!/^0\.0\.\d+$/.test(normalizedContractId)) throw new Error("VERITY_ESCROW_CONTRACT_ID_INVALID: use a Hedera contract ID in 0.0.N format");
+    this.contractId = normalizedContractId;
     if (!Number.isSafeInteger(gas) || gas <= 0) throw new Error("VERITY_ESCROW_GAS_INVALID: use a positive safe integer gas limit");
   }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { PrivateKey } from "@hiero-ledger/sdk";
 import test from "node:test";
-import { createHederaClient, toBytes32, VerityEscrowClient, type EscrowCallResult, type EscrowExecutor, type EscrowScheduleResult, type EscrowScheduler } from "../src/index.ts";
+import { createHederaClient, HederaEscrowExecutor, toBytes32, VerityEscrowClient, type EscrowCallResult, type EscrowExecutor, type EscrowScheduleResult, type EscrowScheduler } from "../src/index.ts";
 
 class ExecutorForTest implements EscrowExecutor, EscrowScheduler {
   public readonly calls: { functionName: string; payableTinybars?: string }[] = [];
@@ -60,4 +60,5 @@ test("rejects invalid escrow amounts and recipient addresses", async () => {
   assert.throws(() => escrow.postBond("dispute-1", "provider-root", "0"), /VERITY_ESCROW_AMOUNT_INVALID/);
   assert.throws(() => escrow.resolveBond("dispute-1", false, "0.0.1", `0x${"02".repeat(20)}`), /VERITY_ESCROW_ADDRESS_INVALID/);
   assert.throws(() => escrow.scheduleBondExpiry("dispute-1", `0x${"02".repeat(20)}`, new Date(Date.now() - 1)), /VERITY_ESCROW_EXPIRY_INVALID/);
+  assert.throws(() => new HederaEscrowExecutor({} as never, "contract", 100_000), /VERITY_ESCROW_CONTRACT_ID_INVALID/);
 });
