@@ -23,7 +23,8 @@ const contentStore = new HttpContentStore(required("CONTENT_STORE_BASE_URL"), fe
   ...(process.env.CONTENT_STORE_WRITE_TOKEN?.trim() ? { writeToken: process.env.CONTENT_STORE_WRITE_TOKEN.trim() } : {})
 });
 const providerId = requiredAny(["VERITY_DEMO_BAD_PROVIDER_ID", "VERITY_DEMO_PROVIDER_ID", "VERITY_PROVIDER_ID"]);
-const buyerId = required("VERITY_DEMO_BUYER_ROOT");
+const buyerId = requiredAny(["VERITY_DEMO_BUYER_ID", "HEDERA_CLIENT_ACCOUNT_ID"]);
+const buyerHumanRoot = process.env.VERITY_DEMO_BUYER_ROOT?.trim();
 const providerRoot = requiredAny(["VERITY_DEMO_PROVIDER_ROOT", "VERITY_PROVIDER_ROOT"]);
 const bond = required("VERITY_DEMO_BOND");
 const identityProof = parseJsonObject(required("VERITY_DEMO_IDENTITY_PROOF_JSON"), "VERITY_DEMO_IDENTITY_PROOF_JSON");
@@ -79,7 +80,7 @@ try {
     requestId,
     providerId,
     buyerId,
-    humanRoot: buyerId,
+    ...(buyerHumanRoot ? { humanRoot: buyerHumanRoot } : {}),
     providerRoot,
     identityProof,
     identitySignal,

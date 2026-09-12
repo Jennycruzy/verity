@@ -4,6 +4,8 @@ COPY package.json package-lock.json ./
 COPY packages ./packages
 COPY services ./services
 COPY apps ./apps
+COPY docs ./docs
+COPY scripts ./scripts
 COPY tsconfig.json tsconfig.base.json ./
 RUN npm ci --ignore-scripts
 RUN npm run build

@@ -76,11 +76,11 @@ services:
   checker:
     build:
       context: services/checker-go
-    env_file: .env
     restart: unless-stopped
     environment:
       CHECKER_PORT: "3201"
       CHECKER_ID: fx-independent-go
+      CHECKER_MAX_BODY_BYTES: "65536"
 
   disputes:
     <<: *node
@@ -93,6 +93,7 @@ services:
     environment:
       DISPUTE_PORT: "8091"
       DISPUTE_STORE_DIR: /data/disputes
+      VERITY_ROOT_STORE_PATH: /data/disputes/identity-roots.json
       CONTENT_STORE_BASE_URL: http://content:8090
       DISPUTE_CHECKERS_JSON: '[{"id":"fx-node-a","url":"http://fx:8080/check"},{"id":"fx-node-b","url":"http://fx-secondary:8080/check"},{"id":"fx-independent-go","url":"http://checker:3201/check"}]'
     volumes:

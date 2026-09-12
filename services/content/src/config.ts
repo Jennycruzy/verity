@@ -20,9 +20,6 @@ function positiveInteger(env: NodeJS.ProcessEnv, name: string): number {
 
 export function readContentServiceConfig(env: NodeJS.ProcessEnv = process.env): ContentServiceConfig {
   const writeToken = env.CONTENT_STORE_WRITE_TOKEN?.trim();
-  if (env.CONTENT_STORE_WRITE_TOKEN !== undefined && !writeToken) {
-    throw new Error("VERITY_CONTENT_CONFIG_INVALID: CONTENT_STORE_WRITE_TOKEN must be omitted or non-empty");
-  }
   return {
     port: positiveInteger(env, "CONTENT_STORE_PORT"),
     directory: required(env, "CONTENT_STORE_DIR"),

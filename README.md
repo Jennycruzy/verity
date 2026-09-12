@@ -222,7 +222,7 @@ To protect a bonded rejection from a process crash after the bond is posted, set
 
 ## Paid request and replay
 
-Configure `VERITY_DEMO_PROVIDER_URL`, the matching rule and expected value, provider/buyer IDs, and the HCS topics. Then run:
+Configure `VERITY_DEMO_PROVIDER_URL`, the matching rule and expected value, provider/buyer IDs, and the HCS topics. `VERITY_DEMO_BUYER_ID` is only the receipt label; the dispute service derives the authoritative human root from the verified proof, so `VERITY_DEMO_BUYER_ROOT` is optional unless the paid provider itself enforces a root header. Then run:
 
 ```sh
 npm run demo
