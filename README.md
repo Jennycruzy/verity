@@ -196,6 +196,8 @@ npx verity replay <disputeId>
 
 Replay reads the dispute record from Mirror Node, fetches the evaluation input, delivered response, and every competing provider response by recorded SHA-256, verifies each byte stream, recomputes each checker vote and the strict majority locally, prints the recorded and replayed result, and exits non-zero on any mismatch. It does not use the dispute database or a Verity service.
 
+The signed-transfer hold has been measured on Hedera Testnet rather than inferred from the facilitator timeout. A fresh transfer settled after 100 seconds and expired after 101 seconds; with a 10-second safety margin, the recommended maximum hold is 91 seconds. See [docs/HOLD-WINDOW.md](docs/HOLD-WINDOW.md) for the run record and HashScan transactions.
+
 ## Public records
 
 The settlement topic is configured by `HCS_SETTLEMENT_TOPIC_ID`; the dispute topic is configured by `HCS_DISPUTE_TOPIC_ID`. Each disputed result produces three compact HCS messages with the same timestamp:
@@ -211,6 +213,7 @@ Live Hedera Testnet records:
 | Settlement topic | `0.0.10501385` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501385) |
 | Dispute topic | `0.0.10501386` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501386) |
 | Bond escrow | `0.0.10502300` | [Contract](https://hashscan.io/testnet/contract/0.0.10502300) · [Creation transaction](https://hashscan.io/testnet/transaction/0.0.10472838@1789221045.369240725) |
+| Signed-transfer measurement | 100 seconds settled; 101 seconds expired | [100-second settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789224054.629001290) · [run record](docs/HOLD-WINDOW.md) |
 
 A replayable dispute ID will be added only after a complete live rejection is recorded.
 
@@ -222,7 +225,7 @@ The resource server delivers before settlement, so the payment hold must survive
 
 | Capability | Evidence in this repository | Current status |
 | --- | --- | --- |
-| Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; needs a live testnet run |
+| Live x402 resource path | `services/providers/src/app.ts:1` and `packages/sdk/src/protect.ts:1` | Implemented; local provider is live, paid testnet settlement remains to be recorded |
 | HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; settlement and dispute topics live on testnet |
 | Mirror Node replay | `packages/replay/src/index.ts:1` | Implemented and tested |
 | Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed on testnet; provider stake remains to be posted |
