@@ -25,3 +25,7 @@ explorer.{$VERITY_DOMAIN} {
 reputation.{$VERITY_DOMAIN} {
   reverse_proxy graph-query:8092
 }
+
+identity.{$VERITY_DOMAIN} {
+  reverse_proxy world-id:8093
+}

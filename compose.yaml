@@ -77,6 +77,12 @@ services:
     environment:
       GRAPH_GATEWAY_PORT: "8092"
 
+  world-id:
+    <<: *node
+    command: ["npm", "--workspace", "@verity/world-id-service", "start"]
+    environment:
+      WORLD_ID_PORT: "8093"
+
   explorer:
     <<: *node
     command: ["npm", "--workspace", "@verity/explorer", "start"]

@@ -13,6 +13,7 @@
     { "path": "./services/providers" },
     { "path": "./services/content" },
     { "path": "./services/graph-gateway" },
+    { "path": "./services/world-id" },
     { "path": "./services/disputes" },
     { "path": "./services/settlement" },
     { "path": "./apps/explorer" }
