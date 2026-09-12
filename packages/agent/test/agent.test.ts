@@ -65,6 +65,18 @@ test("World ID verifier claims a root only once under concurrent requests", asyn
   assert.match(String(results.find((result) => result.status === "rejected")?.reason), /VERITY_WORLD_ID_REPLAY/);
 });
 
+test("allows the same human root on distinct bound signals", async () => {
+  const verifier = new WorldIdVerifier(
+    { verifyUrl: "https://world.invalid/verify", action: "dispute" },
+    new MemoryRootStore(),
+    async () => new Response(JSON.stringify({ success: true, action: "dispute", nullifier: "root-1" }), { status: 200 })
+  );
+  const first = await verifier.verify({ proof: "opaque-a", signal_hash: hashWorldSignal("dispute-1") }, "dispute-1");
+  const second = await verifier.verify({ proof: "opaque-b", signal_hash: hashWorldSignal("dispute-2") }, "dispute-2");
+  assert.equal(first.root, "root-1");
+  assert.equal(second.root, "root-1");
+});
+
 test("World ID verifier rejects a proof verified for another action", async () => {
   const verifier = new WorldIdVerifier(
     { verifyUrl: "https://world.invalid/verify", action: "register-provider" },

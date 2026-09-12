@@ -78,8 +78,9 @@ export class WorldIdVerifier {
     const rootValue = extractWorldRoot(body);
     if (!rootValue) throw new Error("VERITY_WORLD_ID_ROOT_MISSING: verifier returned no durable root");
     const root = normalizeWorldRoot(rootValue);
-    if (!await this.roots.claim(this.config.action, root)) {
-      throw new Error("VERITY_WORLD_ID_REPLAY: this root has already been used for the configured action");
+    const replayScope = `${this.config.action}:${hashWorldSignal(signal)}`;
+    if (!await this.roots.claim(replayScope, root)) {
+      throw new Error("VERITY_WORLD_ID_REPLAY: this proof has already been used for the configured action and signal");
     }
     return { root, action: this.config.action, verifiedAt: new Date().toISOString(), provider: "world-id" };
   }
