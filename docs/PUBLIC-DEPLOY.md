@@ -59,6 +59,12 @@ WORLD_ID_SIGNING_KEY=<local-world-signing-key>
 WORLD_ID_VERIFY_URL=https://developer.world.org/api/v4/verify/<rp_id>
 WORLD_ID_DISPUTE_ACTION=<configured-world-action>
 WORLD_ID_ENVIRONMENT=production
+
+# Provider-side refusal for low-honesty buyers.
+VERITY_BUYER_REPUTATION_ENDPOINT=<hosted-studio-query-url>
+VERITY_BUYER_REPUTATION_API_KEY=<hosted-graph-api-key>
+VERITY_BUYER_REPUTATION_QUERY_FILE=docs/graph/agent0-buyer.query.json
+VERITY_BUYER_REPUTATION_MIN_HONESTY=0.8
 ```
 
 Copy the Hedera account credentials and the already-provisioned topic/contract values from the local `.env` only over a secure connection. Do not paste private keys into GitHub, Discord, or this repository. The Graph signer private keys are only needed by the local registration/feedback commands; they do not belong in the public image.
@@ -74,6 +80,8 @@ npm run graph:check-hosted
 This sends only the standard `_meta` read query, prints the indexed block number, and never prints the Graph credential. The public gateway exposes the same check at `/ready`; `npm run public:check` fails if the process is alive but the hosted index is unavailable.
 
 The content service keeps replay reads public but protects object uploads when `CONTENT_STORE_WRITE_TOKEN` is set. Use a long random token on a public deployment and copy it only to the buyer machine's private `.env`.
+
+The primary `fx` service uses the provider-side buyer policy when all six policy values are present. It verifies the World proof carried by `buy()` and queries the hosted buyer score before delivering the response. The checker and degraded processes explicitly disable this policy; they never share the primary provider's human or ERC-8004 identity.
 
 ## 3. Start and smoke-test
 

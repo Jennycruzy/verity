@@ -149,6 +149,30 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     });
   }
 
+  const buyerReputationFields = [
+    env.VERITY_BUYER_REPUTATION_ENDPOINT?.trim(),
+    env.VERITY_BUYER_REPUTATION_API_KEY?.trim(),
+    env.VERITY_BUYER_REPUTATION_QUERY_FILE?.trim(),
+    env.VERITY_BUYER_REPUTATION_MIN_HONESTY?.trim()
+  ].filter(Boolean).length;
+  if (buyerReputationFields !== 0 && buyerReputationFields !== 4) {
+    checks.push({
+      key: "VERITY_BUYER_REPUTATION_ENDPOINT + VERITY_BUYER_REPUTATION_API_KEY + VERITY_BUYER_REPUTATION_QUERY_FILE + VERITY_BUYER_REPUTATION_MIN_HONESTY",
+      state: "invalid",
+      scope: "provider",
+      detail: "set all provider-side buyer admission values together"
+    });
+  }
+  const minimumHonesty = env.VERITY_BUYER_REPUTATION_MIN_HONESTY?.trim();
+  if (minimumHonesty && (!Number.isFinite(Number(minimumHonesty)) || Number(minimumHonesty) < 0 || Number(minimumHonesty) > 1)) {
+    checks.push({
+      key: "VERITY_BUYER_REPUTATION_MIN_HONESTY",
+      state: "invalid",
+      scope: "provider",
+      detail: "use a number from 0 through 1"
+    });
+  }
+
   const graphSignerFields = [
     env.GRAPH_FEEDBACK_PROVIDER_PRIVATE_KEY?.trim(),
     env.GRAPH_FEEDBACK_BUYER_PRIVATE_KEY?.trim()

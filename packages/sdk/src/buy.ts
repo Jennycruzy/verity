@@ -4,7 +4,7 @@ import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements, Set
 import { HttpContentStore, type ContentStore } from "@verity/content";
 import { Blocky402Client, discoverHederaCapability, readBuyerConfig } from "@verity/hedera";
 import { createHederaClient, createVerityEscrowClient } from "@verity/hcs";
-import { evaluateEntity, evaluateFxRate, RULE_IDS, type ContentReference, type DeterministicVerdict, type RuleId } from "@verity/types";
+import { evaluateEntity, evaluateFxRate, RULE_IDS, VERITY_HUMAN_ROOT_HEADER, VERITY_WORLD_PROOF_HEADER, VERITY_WORLD_SIGNAL_HEADER, type ContentReference, type DeterministicVerdict, type RuleId } from "@verity/types";
 
 export type Evaluator = RuleId | ((value: unknown, response: Response, requirements: PaymentRequirements) => DeterministicVerdict | Promise<DeterministicVerdict>);
 export type EvaluationInputResolver = (value: unknown, response: Response, requirements: PaymentRequirements) => unknown | Promise<unknown>;
@@ -24,6 +24,7 @@ export interface BuyOptions {
   readonly disputeId?: string;
   readonly providerId?: string;
   readonly buyerId?: string;
+  readonly humanRoot?: string;
   readonly buyerAddress?: string;
   readonly providerRoot?: string;
   readonly identityProof?: Readonly<Record<string, unknown>>;
@@ -74,9 +75,11 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
   );
   const client = new x402Client().setSpendControls(false).register(config.network as Network, new ExactHederaScheme(signer));
   const paymentPayload = await client.createPaymentPayload(paymentRequired);
+  const paidHeaders = new Headers({ "payment-signature": encodePaymentSignatureHeader(paymentPayload) });
+  addIdentityHeaders(paidHeaders, options);
   const paidResponse = await fetchImpl(url, {
     method: "GET",
-    headers: { "payment-signature": encodePaymentSignatureHeader(paymentPayload) }
+    headers: paidHeaders
   });
   if (!paidResponse.ok) {
     const detail = await paidResponse.text();
@@ -190,6 +193,30 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
 function requiredOption(value: string | undefined, message: string): string {
   if (!value?.trim()) throw new Error(message);
   return value.trim();
+}
+
+function addIdentityHeaders(headers: Headers, options: BuyOptions): void {
+  const humanRoot = options.humanRoot?.trim();
+  if (options.humanRoot !== undefined && !humanRoot) throw new Error("VERITY_HUMAN_ROOT_INVALID: humanRoot must be non-empty");
+  if (humanRoot) headers.set(VERITY_HUMAN_ROOT_HEADER, humanRoot);
+
+  if (options.identityProof !== undefined) {
+    if (!options.identityProof || typeof options.identityProof !== "object" || Array.isArray(options.identityProof)) {
+      throw new Error("VERITY_IDENTITY_PROOF_INVALID: World ID proof must be a JSON object");
+    }
+    if (!options.identitySignal?.trim()) throw new Error("VERITY_IDENTITY_SIGNAL_MISSING: provide identitySignal with identityProof");
+    let encoded: string;
+    try {
+      encoded = Buffer.from(JSON.stringify(options.identityProof), "utf8").toString("base64url");
+    } catch (error) {
+      throw new Error("VERITY_IDENTITY_PROOF_INVALID: World ID proof could not be encoded", { cause: error });
+    }
+    if (encoded.length > 16_384) throw new Error("VERITY_IDENTITY_PROOF_TOO_LARGE: World ID proof exceeds the request header limit");
+    headers.set(VERITY_WORLD_PROOF_HEADER, encoded);
+    headers.set(VERITY_WORLD_SIGNAL_HEADER, options.identitySignal.trim());
+  } else if (options.identitySignal?.trim()) {
+    throw new Error("VERITY_IDENTITY_PROOF_MISSING: identitySignal requires identityProof");
+  }
 }
 
 function requiredEnvironment(name: string): string {

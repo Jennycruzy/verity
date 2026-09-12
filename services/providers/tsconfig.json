@@ -7,6 +7,7 @@
     "declaration": true
   },
   "references": [
+    { "path": "../../packages/agent" },
     { "path": "../../packages/indexer" },
     { "path": "../../packages/sdk" },
     { "path": "../../packages/types" }

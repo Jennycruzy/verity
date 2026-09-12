@@ -58,3 +58,30 @@ test("reads an ERC-8004 publication configuration", () => {
     agentId: "7"
   });
 });
+
+test("requires complete provider-side buyer admission configuration", () => {
+  assert.throws(
+    () => readProviderServiceConfig({ ...baseEnvironment, VERITY_BUYER_REPUTATION_ENDPOINT: "https://graph.invalid/query" }),
+    /buyer reputation admission requires/
+  );
+});
+
+test("reads provider-side buyer admission configuration", () => {
+  const config = readProviderServiceConfig({
+    ...baseEnvironment,
+    VERITY_BUYER_REPUTATION_ENDPOINT: "https://graph.invalid/query",
+    VERITY_BUYER_REPUTATION_API_KEY: "graph-key",
+    VERITY_BUYER_REPUTATION_QUERY_FILE: "docs/graph/agent0-buyer.query.json",
+    VERITY_BUYER_REPUTATION_MIN_HONESTY: "0.8",
+    WORLD_ID_VERIFY_URL: "https://world.invalid/verify",
+    WORLD_ID_DISPUTE_ACTION: "verity-dispute"
+  });
+  assert.deepEqual(config.buyerReputation, {
+    endpoint: "https://graph.invalid/query",
+    apiKey: "graph-key",
+    queryFile: "docs/graph/agent0-buyer.query.json",
+    minimumHonesty: 0.8,
+    verifyUrl: "https://world.invalid/verify",
+    action: "verity-dispute"
+  });
+});

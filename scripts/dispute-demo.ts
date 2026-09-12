@@ -79,6 +79,7 @@ try {
     requestId,
     providerId,
     buyerId,
+    humanRoot: buyerId,
     providerRoot,
     identityProof,
     identitySignal,

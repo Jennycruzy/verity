@@ -5,6 +5,10 @@ export const RULE_IDS = {
   entityCanonical: "entity-canonical-v1"
 } as const;
 
+export const VERITY_HUMAN_ROOT_HEADER = "x-verity-human-root" as const;
+export const VERITY_WORLD_PROOF_HEADER = "x-verity-world-proof" as const;
+export const VERITY_WORLD_SIGNAL_HEADER = "x-verity-world-signal" as const;
+
 export type RuleId = (typeof RULE_IDS)[keyof typeof RULE_IDS];
 export type Verdict = "accept" | "reject";
 

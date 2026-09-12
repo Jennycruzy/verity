@@ -2,6 +2,15 @@ import { readProviderConfig, type ProviderConfig } from "@verity/hedera";
 
 export type ProviderKind = "fx" | "entity";
 
+export interface BuyerReputationPolicyConfig {
+  readonly endpoint: string;
+  readonly apiKey: string;
+  readonly queryFile: string;
+  readonly minimumHonesty: number;
+  readonly verifyUrl: string;
+  readonly action: string;
+}
+
 export interface ProviderServiceConfig extends ProviderConfig {
   readonly kind: ProviderKind;
   readonly port: number;
@@ -18,6 +27,7 @@ export interface ProviderServiceConfig extends ProviderConfig {
     readonly registry: string;
     readonly agentId: string;
   };
+  readonly buyerReputation?: BuyerReputationPolicyConfig;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -72,6 +82,19 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
     }
   }
 
+  const buyerReputationFields = [
+    env.VERITY_BUYER_REPUTATION_ENDPOINT?.trim(),
+    env.VERITY_BUYER_REPUTATION_API_KEY?.trim(),
+    env.VERITY_BUYER_REPUTATION_QUERY_FILE?.trim(),
+    env.VERITY_BUYER_REPUTATION_MIN_HONESTY?.trim(),
+    env.WORLD_ID_VERIFY_URL?.trim(),
+    env.WORLD_ID_DISPUTE_ACTION?.trim()
+  ].filter(Boolean).length;
+  if (buyerReputationFields !== 0 && buyerReputationFields !== 6) {
+    throw new Error("VERITY_PROVIDER_CONFIG_INVALID: buyer reputation admission requires endpoint, API key, query file, honesty threshold, World verify URL, and World action");
+  }
+  const buyerReputation = buyerReputationFields === 6 ? readBuyerReputationConfig(env) : undefined;
+
   return {
     ...readProviderConfig(env),
     kind,
@@ -84,6 +107,34 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
     entityCachedPrice: amount(env, "ENTITY_CACHED_PRICE"),
     entityFreshPrice: amount(env, "ENTITY_FRESH_PRICE"),
     degradeMode,
-    ...(publicUrl && registry && agentId ? { erc8004: { publicUrl, registry, agentId } } : {})
+    ...(publicUrl && registry && agentId ? { erc8004: { publicUrl, registry, agentId } } : {}),
+    ...(buyerReputation ? { buyerReputation } : {})
   };
+}
+
+function readBuyerReputationConfig(env: NodeJS.ProcessEnv): BuyerReputationPolicyConfig {
+  const endpoint = requiredHttpUrl(env, "VERITY_BUYER_REPUTATION_ENDPOINT");
+  const apiKey = required(env, "VERITY_BUYER_REPUTATION_API_KEY");
+  const queryFile = required(env, "VERITY_BUYER_REPUTATION_QUERY_FILE");
+  const minimumHonesty = Number(required(env, "VERITY_BUYER_REPUTATION_MIN_HONESTY"));
+  if (!Number.isFinite(minimumHonesty) || minimumHonesty < 0 || minimumHonesty > 1) {
+    throw new Error("VERITY_PROVIDER_CONFIG_INVALID: VERITY_BUYER_REPUTATION_MIN_HONESTY must be between 0 and 1");
+  }
+  const verifyUrl = requiredHttpUrl(env, "WORLD_ID_VERIFY_URL");
+  const action = required(env, "WORLD_ID_DISPUTE_ACTION");
+  return { endpoint, apiKey, queryFile, minimumHonesty, verifyUrl, action };
+}
+
+function requiredHttpUrl(env: NodeJS.ProcessEnv, name: string): string {
+  const value = required(env, name);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch (error) {
+    throw new Error(`VERITY_PROVIDER_CONFIG_INVALID: ${name} must be an absolute HTTP(S) URL`, { cause: error });
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`VERITY_PROVIDER_CONFIG_INVALID: ${name} must be an absolute HTTP(S) URL`);
+  }
+  return url.toString();
 }

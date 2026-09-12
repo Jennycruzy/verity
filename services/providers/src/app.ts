@@ -2,14 +2,17 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { createErc8004Registration } from "@verity/indexer";
 import { protect, type ProtectedApplication, type ProtectedRequest } from "@verity/sdk";
 import { canonicalizeEntity, evaluateEntity, evaluateFxRate, RULE_IDS, type RuleId } from "@verity/types";
+import { BuyerAdmissionError, BuyerReputationPolicy, BuyerReputationUnavailableError } from "./buyer-policy.js";
 import type { ProviderServiceConfig } from "./config.js";
 
-export function createProviderServer(config: ProviderServiceConfig) {
-  return createServer(createProviderHandler(config));
+export function createProviderServer(config: ProviderServiceConfig, buyerReputation?: BuyerReputationPolicy) {
+  return createServer(createProviderHandler(config, buyerReputation));
 }
 
-export function createProviderHandler(config: ProviderServiceConfig) {
-  const protectedApplication = config.kind === "fx" ? createFxApplication(config) : createEntityApplication(config);
+export function createProviderHandler(config: ProviderServiceConfig, buyerReputation?: BuyerReputationPolicy) {
+  const protectedApplication = config.kind === "fx"
+    ? createFxApplication(config, buyerReputation)
+    : createEntityApplication(config, buyerReputation);
   const registration = config.erc8004 ? createErc8004Registration({
     name: `Verity ${config.kind} provider`,
     description: config.kind === "fx" ? "An objectively verifiable foreign-exchange rate service." : "An objectively verifiable entity-resolution service.",
@@ -68,7 +71,12 @@ export function createProviderHandler(config: ProviderServiceConfig) {
       );
     } catch (error) {
       if (response.writableEnded) return;
-      writeJson(response, error instanceof CheckerBodyTooLargeError ? 413 : 502, {
+      const statusCode = error instanceof CheckerBodyTooLargeError
+        ? 413
+        : error instanceof BuyerAdmissionError || error instanceof BuyerReputationUnavailableError
+          ? error.statusCode
+          : 502;
+      writeJson(response, statusCode, {
         error: error instanceof Error ? error.message : String(error)
       });
     }
@@ -113,8 +121,9 @@ async function handleCheck(request: IncomingMessage, response: ServerResponse, c
   }
 }
 
-function createFxApplication(config: ProviderServiceConfig): ProtectedApplication {
-  return async (_request, response) => {
+function createFxApplication(config: ProviderServiceConfig, buyerReputation?: BuyerReputationPolicy): ProtectedApplication {
+  return async (request, response) => {
+    await buyerReputation?.assertEligible(request);
     const rate = config.degradeMode ? config.degradedFxRate : config.fxReferenceRate;
     if (!rate) throw new Error("VERITY_PROVIDER_RATE_MISSING: rate was not available after config validation");
     writeJson(response, 200, {
@@ -129,8 +138,9 @@ function createFxApplication(config: ProviderServiceConfig): ProtectedApplicatio
   };
 }
 
-function createEntityApplication(config: ProviderServiceConfig): ProtectedApplication {
+function createEntityApplication(config: ProviderServiceConfig, buyerReputation?: BuyerReputationPolicy): ProtectedApplication {
   return async (request, response) => {
+    await buyerReputation?.assertEligible(request);
     const name = queryValue(request, "name");
     if (!name) {
       writeJson(response, 400, { error: "name_required" });
@@ -204,8 +214,8 @@ class CheckerBodyTooLargeError extends Error {
   }
 }
 
-export function startProvider(config: ProviderServiceConfig): ReturnType<typeof createServer> {
-  const server = createProviderServer(config);
+export function startProvider(config: ProviderServiceConfig, buyerReputation?: BuyerReputationPolicy): ReturnType<typeof createServer> {
+  const server = createProviderServer(config, buyerReputation);
   server.listen(config.port, () => {
     console.log(JSON.stringify({ provider: config.kind, port: config.port, degradeMode: config.degradeMode }));
   });

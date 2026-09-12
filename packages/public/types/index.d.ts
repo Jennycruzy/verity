@@ -42,6 +42,7 @@ export interface BuyOptions {
   readonly disputeId?: string;
   readonly providerId?: string;
   readonly buyerId?: string;
+  readonly humanRoot?: string;
   readonly buyerAddress?: string;
   readonly providerRoot?: string;
   readonly identityProof?: Readonly<Record<string, unknown>>;

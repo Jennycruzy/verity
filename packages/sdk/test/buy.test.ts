@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PrivateKey } from "@hiero-ledger/sdk";
 import test from "node:test";
 import { Blocky402Client } from "@verity/hedera";
-import { evaluateFxRate, sha256, type ContentReference } from "@verity/types";
+import { evaluateFxRate, sha256, VERITY_HUMAN_ROOT_HEADER, VERITY_WORLD_PROOF_HEADER, VERITY_WORLD_SIGNAL_HEADER, type ContentReference } from "@verity/types";
 import { buy } from "../src/buy.ts";
 
 class DiscoveryOnlyFacilitator extends Blocky402Client {
@@ -45,6 +45,10 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     }
     if (url === "https://provider.invalid/fx") {
       calls.push("delivery");
+      const headers = new Headers(init?.headers);
+      assert.equal(headers.get(VERITY_HUMAN_ROOT_HEADER), "42");
+      assert.equal(headers.get(VERITY_WORLD_SIGNAL_HEADER), "request-1");
+      assert.equal(typeof headers.get(VERITY_WORLD_PROOF_HEADER), "string");
       return new Response(JSON.stringify({ expectedRate: "1.00", rate: "1.10", toleranceBps: 0 }), { status: 200, headers: { "content-type": "application/json" } });
     }
     assert.equal(url, "https://dispute.invalid/disputes");
@@ -72,6 +76,7 @@ test("posts a bond before submitting the deterministic dispute payload", async (
     disputeUrl: "https://dispute.invalid/disputes",
     providerId: "provider-1",
     buyerId: "buyer-1",
+    humanRoot: "42",
     buyerAddress: `0x${clientKey.publicKey.toEvmAddress()}`,
     providerRoot: "provider-root",
     identityProof: { proof: "opaque" },
