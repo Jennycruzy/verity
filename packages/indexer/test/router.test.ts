@@ -18,3 +18,15 @@ test("routing fails when the queried subgraph rejects every provider", async () 
   );
   await assert.rejects(router.choose([{ agentId: "provider", endpoint: "https://provider.invalid" }]), /VERITY_ROUTER_NO_ELIGIBLE_PROVIDER/);
 });
+
+test("routing breaks equal scores with stable byte ordering", async () => {
+  const router = new ReputationRouter(
+    { provider: async (agentId) => ({ agentId, endpoint: `https://${agentId}.invalid`, reliabilityScore: 0.9, completedRequests: 1 }), buyer: async (root) => ({ root, honestyScore: 1, disputes: 0 }) },
+    0.5
+  );
+  const selected = await router.choose([
+    { agentId: "provider-z", endpoint: "https://z.invalid" },
+    { agentId: "provider-a", endpoint: "https://a.invalid" }
+  ]);
+  assert.equal(selected.agentId, "provider-a");
+});

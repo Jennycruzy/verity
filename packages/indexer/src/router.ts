@@ -23,7 +23,8 @@ export class ReputationRouter {
     if (eligible.length === 0) throw new Error("VERITY_ROUTER_NO_ELIGIBLE_PROVIDER: queried reputation rejected every candidate");
     eligible.sort((left, right) => {
       const score = right.reputation.reliabilityScore - left.reputation.reliabilityScore;
-      return score !== 0 ? score : left.agentId.localeCompare(right.agentId);
+      if (score !== 0) return score;
+      return left.agentId < right.agentId ? -1 : left.agentId > right.agentId ? 1 : 0;
     });
     return eligible[0] as RoutedProvider;
   }
