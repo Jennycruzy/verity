@@ -16,3 +16,27 @@ test("reads topics without duplicating the Mirror Node API path", async () => {
   });
   assert.deepEqual(result, []);
 });
+
+test("rejects a topic page with malformed message metadata", async () => {
+  await assert.rejects(
+    () => readTopicRecords("https://mirror.invalid", "0.0.7", {
+      fetchImpl: async () => new Response(JSON.stringify({
+        messages: [{ consensus_timestamp: "1.000000000", sequence_number: 0, message: "e30=" }],
+        links: { next: null }
+      }), { status: 200 })
+    }),
+    /VERITY_MIRROR_SCHEMA/
+  );
+});
+
+test("rejects invalid base64 before decoding a topic message", async () => {
+  await assert.rejects(
+    () => readTopicRecords("https://mirror.invalid", "0.0.7", {
+      fetchImpl: async () => new Response(JSON.stringify({
+        messages: [{ consensus_timestamp: "1.000000000", sequence_number: 1, message: "not-base64" }],
+        links: { next: null }
+      }), { status: 200 })
+    }),
+    /VERITY_MIRROR_SCHEMA/
+  );
+});

@@ -60,5 +60,30 @@ export function normalizeMirrorNodeBaseUrl(value: string): string {
 function isMirrorPage(value: unknown): value is MirrorPage {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<MirrorPage>;
-  return Array.isArray(candidate.messages);
+  return Array.isArray(candidate.messages)
+    && candidate.messages.every(isMirrorTopicMessage)
+    && (candidate.links === undefined || isMirrorLinks(candidate.links));
+}
+
+function isMirrorTopicMessage(value: unknown): value is MirrorTopicMessage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<MirrorTopicMessage>;
+  return typeof candidate.consensus_timestamp === "string"
+    && candidate.consensus_timestamp.trim().length > 0
+    && typeof candidate.sequence_number === "number"
+    && Number.isSafeInteger(candidate.sequence_number)
+    && candidate.sequence_number > 0
+    && typeof candidate.message === "string"
+    && candidate.message.length > 0
+    && isBase64(candidate.message);
+}
+
+function isMirrorLinks(value: unknown): value is NonNullable<MirrorPage["links"]> {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { next?: unknown };
+  return candidate.next === undefined || candidate.next === null || (typeof candidate.next === "string" && candidate.next.trim().length > 0);
+}
+
+function isBase64(value: string): boolean {
+  return value.length % 4 === 0 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value);
 }
