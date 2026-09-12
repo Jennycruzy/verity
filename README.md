@@ -186,6 +186,8 @@ The buyer calls the provider, receives the response, evaluates it locally, and s
 
 For a rejected response, the buyer additionally needs a World ID proof, `VERITY_DISPUTE_URL`, a positive bond, one content reference per configured checker response, the escrow contract settings, and a running dispute service. The rejection path posts the bond before it sends the dispute request. There is no local identity substitute in the live path.
 
+`HEDERA_CLIENT_EVM_ADDRESS` may remain blank: the SDK derives the buyer address from `HEDERA_CLIENT_PRIVATE_KEY` and rejects a configured address that does not match that key.
+
 After a dispute receipt is visible on the configured topic:
 
 ```sh
