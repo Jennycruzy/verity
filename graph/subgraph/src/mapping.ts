@@ -147,8 +147,10 @@ function handleRegistered(
   }
   agent.owner = addressFromTopic(event.topics[2])
   agent.agentURI = decodeSingleString(event.data)
-  const registrationRoot = extractHumanRoot(agent.agentURI)
-  if (registrationRoot !== null) agent.humanRoot = registrationRoot
+  if (agent.agentURI !== null) {
+    const registrationRoot = extractHumanRoot(agent.agentURI as string)
+    if (registrationRoot !== null) agent.humanRoot = registrationRoot
+  }
   agent.updatedAt = timestamp
   agent.lastActivity = timestamp
   agent.save()
