@@ -24,6 +24,15 @@ test("stable JSON sorts object keys without changing array order", () => {
   assert.equal(stableJson({ b: 2, a: 1, list: [{ z: true, y: false }] }), '{"a":1,"b":2,"list":[{"y":false,"z":true}]}');
 });
 
+test("stable JSON rejects values that would hash ambiguously", () => {
+  assert.throws(() => stableJson(undefined), /VERITY_JSON_UNSUPPORTED/);
+  assert.throws(() => stableJson({ value: Number.NaN }), /VERITY_JSON_UNSUPPORTED/);
+  assert.throws(() => stableJson([, 1]), /VERITY_JSON_SPARSE_ARRAY/);
+  const circular: { self?: unknown } = {};
+  circular.self = circular;
+  assert.throws(() => stableJson(circular), /VERITY_JSON_CYCLE/);
+});
+
 test("compact message assertion rejects oversized records", () => {
   assert.throws(() => assertCompactMessage("12345", 4), /maximum is 4 bytes/);
 });

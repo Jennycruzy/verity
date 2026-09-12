@@ -154,16 +154,46 @@ export function evaluateEntity(observation: EntityObservation): DeterministicVer
 }
 
 export function stableJson(value: unknown): string {
-  if (value === null || typeof value !== "object") {
+  return stableJsonValue(value, "$", new WeakSet<object>());
+}
+
+function stableJsonValue(value: unknown, path: string, ancestors: WeakSet<object>): string {
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error(`VERITY_JSON_UNSUPPORTED: ${path} must be a finite number`);
     return JSON.stringify(value);
   }
-
-  if (Array.isArray(value)) {
-    return `[${value.map(stableJson).join(",")}]`;
+  if (typeof value !== "object") {
+    throw new Error(`VERITY_JSON_UNSUPPORTED: ${path} cannot be serialized as canonical JSON`);
   }
-
-  const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
-  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`).join(",")}}`;
+  if (ancestors.has(value)) throw new Error(`VERITY_JSON_CYCLE: ${path} contains a circular reference`);
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const entries: string[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) {
+          throw new Error(`VERITY_JSON_SPARSE_ARRAY: ${path}[${index}] is missing`);
+        }
+        entries.push(stableJsonValue(value[index], `${path}[${index}]`, ancestors));
+      }
+      return `[${entries.join(",")}]`;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error(`VERITY_JSON_UNSUPPORTED: ${path} must be a plain object`);
+    }
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+      throw new Error(`VERITY_JSON_UNSUPPORTED: ${path} contains symbol keys`);
+    }
+    const objectValue = value as Record<string, unknown>;
+    const keys = Object.keys(objectValue).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJsonValue(objectValue[key], `${path}.${key}`, ancestors)}`).join(",")}}`;
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 export function sha256(value: string | Uint8Array): string {
