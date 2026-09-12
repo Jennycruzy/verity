@@ -1,12 +1,14 @@
 import { config as loadDotenv } from "dotenv";
-import { JsonRpcProvider, keccak256, toUtf8Bytes } from "ethers";
+import { JsonRpcProvider } from "ethers";
 import { readTopicRecords, normalizeMirrorNodeBaseUrl } from "@verity/hcs";
 import {
   Erc8004ReputationRegistryClient,
+  canonicalHumanRoot,
+  createVerityFeedbackEvidence,
   resolveErc8004EvmRegistry,
   type Erc8004FeedbackTransaction
 } from "@verity/indexer";
-import { stableJson, RULE_IDS, type RuleId, type Verdict } from "@verity/types";
+import { RULE_IDS, type RuleId, type Verdict } from "@verity/types";
 import { fileURLToPath } from "node:url";
 
 loadDotenv({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
@@ -61,7 +63,7 @@ async function publish(disputeId: string): Promise<void> {
 
     const providerWasCorrect = dispute.verdict === "accept";
     const buyerWasHonest = dispute.verdict === "reject";
-    const providerEvidence = feedbackEvidence({
+    const providerEvidence = createVerityFeedbackEvidence({
       disputeId,
       disputeTopicId: topicId,
       recordedAt: record.recordedAt,
@@ -70,9 +72,10 @@ async function publish(disputeId: string): Promise<void> {
       subject: "provider",
       agentRegistry: identityRegistry,
       agentId: providerAgentId,
-      outcome: providerWasCorrect
+      outcome: providerWasCorrect,
+      humanRoot: dispute.providerRoot
     });
-    const buyerEvidence = feedbackEvidence({
+    const buyerEvidence = createVerityFeedbackEvidence({
       disputeId,
       disputeTopicId: topicId,
       recordedAt: record.recordedAt,
@@ -114,47 +117,25 @@ async function publish(disputeId: string): Promise<void> {
   }
 }
 
-function feedbackEvidence(input: {
-  readonly disputeId: string;
-  readonly disputeTopicId: string;
-  readonly recordedAt: string;
-  readonly ruleId: RuleId;
-  readonly verdict: Verdict;
-  readonly subject: "provider" | "buyer";
-  readonly agentRegistry: string;
-  readonly agentId: string;
-  readonly outcome: boolean;
-  readonly humanRoot?: string;
-}): { readonly feedbackURI: string; readonly feedbackHash: string } {
-  const document = stableJson({
-    schema: "verity/agent0-feedback/v1",
-    disputeId: input.disputeId,
-    disputeTopicId: input.disputeTopicId,
-    recordedAt: input.recordedAt,
-    ruleId: input.ruleId,
-    verdict: input.verdict,
-    subject: input.subject,
-    agentRegistry: input.agentRegistry,
-    agentId: input.agentId,
-    outcome: input.outcome
-  });
-  const feedbackHash = keccak256(toUtf8Bytes(document));
-  const rootFragment = input.humanRoot ? `#verity-human-root=${encodeURIComponent(input.humanRoot)}` : "";
-  const feedbackURI = `data:application/json;base64,${Buffer.from(document, "utf8").toString("base64")}${rootFragment}`;
-  return { feedbackURI, feedbackHash };
-}
-
-function parseDispute(value: Record<string, unknown>, disputeId: string): { readonly ruleId: RuleId; readonly verdict: Verdict; readonly buyerRoot: string } {
+function parseDispute(value: Record<string, unknown>, disputeId: string): { readonly ruleId: RuleId; readonly verdict: Verdict; readonly buyerRoot: string; readonly providerRoot: string } {
   if (typeof value.ruleId !== "string" || !isRuleId(value.ruleId)) {
     throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has an unsupported rule`);
   }
   if (value.verdict !== "accept" && value.verdict !== "reject") {
     throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has no final verdict`);
   }
-  if (typeof value.buyerRoot !== "string" || !/^\d+$/.test(value.buyerRoot)) {
+  if (typeof value.buyerRoot !== "string") {
     throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has no canonical buyer root`);
   }
-  return { ruleId: value.ruleId, verdict: value.verdict, buyerRoot: value.buyerRoot };
+  if (typeof value.providerRoot !== "string") {
+    throw new Error(`VERITY_AGENT0_FEEDBACK_SCHEMA: dispute ${disputeId} has no canonical provider root`);
+  }
+  return {
+    ruleId: value.ruleId,
+    verdict: value.verdict,
+    buyerRoot: canonicalHumanRoot(value.buyerRoot),
+    providerRoot: canonicalHumanRoot(value.providerRoot)
+  };
 }
 
 function feedbackSummary(value: Erc8004FeedbackTransaction): Record<string, string> {
