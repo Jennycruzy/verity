@@ -3,6 +3,11 @@ import { createServer, type IncomingMessage } from "node:http";
 
 const routes = [
   { prefix: "/provider", target: "http://127.0.0.1:3101" },
+  { prefix: "/bad-provider", target: "http://127.0.0.1:3102" },
+  { prefix: "/reference-a", target: "http://127.0.0.1:3103" },
+  { prefix: "/entity", target: "http://127.0.0.1:3104" },
+  { prefix: "/reference-b", target: "http://127.0.0.1:3105" },
+  { prefix: "/checker", target: "http://127.0.0.1:3201" },
   { prefix: "/content", target: "http://127.0.0.1:8090" },
   { prefix: "/disputes", target: "http://127.0.0.1:8091" },
   { prefix: "/reputation", target: "http://127.0.0.1:8092" }

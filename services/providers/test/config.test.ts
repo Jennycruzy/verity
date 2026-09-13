@@ -66,6 +66,15 @@ test("requires complete provider-side buyer admission configuration", () => {
   );
 });
 
+test("does not activate buyer admission from shared World configuration alone", () => {
+  const config = readProviderServiceConfig({
+    ...baseEnvironment,
+    WORLD_ID_VERIFY_URL: "https://world.invalid/verify",
+    WORLD_ID_DISPUTE_ACTION: "verity-dispute"
+  });
+  assert.equal(config.buyerReputation, undefined);
+});
+
 test("reads provider-side buyer admission configuration", () => {
   const config = readProviderServiceConfig({
     ...baseEnvironment,

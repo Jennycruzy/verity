@@ -85,19 +85,21 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
     }
   }
 
-  const buyerReputationFields = [
+  const buyerReputationPolicyFields = [
     env.VERITY_BUYER_REPUTATION_ENDPOINT?.trim(),
     env.VERITY_BUYER_REPUTATION_API_KEY?.trim(),
     env.VERITY_BUYER_REPUTATION_QUERY_FILE?.trim(),
     env.VERITY_BUYER_REPUTATION_ROOT_STORE_PATH?.trim(),
-    env.VERITY_BUYER_REPUTATION_MIN_HONESTY?.trim(),
+    env.VERITY_BUYER_REPUTATION_MIN_HONESTY?.trim()
+  ].filter(Boolean).length;
+  const buyerReputationFields = buyerReputationPolicyFields + [
     env.WORLD_ID_VERIFY_URL?.trim(),
     env.WORLD_ID_DISPUTE_ACTION?.trim()
   ].filter(Boolean).length;
-  if (buyerReputationFields !== 0 && buyerReputationFields !== 7) {
+  if (buyerReputationPolicyFields !== 0 && buyerReputationFields !== 7) {
     throw new Error("VERITY_PROVIDER_CONFIG_INVALID: buyer reputation admission requires endpoint, API key, query file, root store path, honesty threshold, World verify URL, and World action");
   }
-  const buyerReputation = buyerReputationFields === 7 ? readBuyerReputationConfig(env) : undefined;
+  const buyerReputation = buyerReputationPolicyFields === 5 ? readBuyerReputationConfig(env) : undefined;
 
   return {
     ...readProviderConfig(env),

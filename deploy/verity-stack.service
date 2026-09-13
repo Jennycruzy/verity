@@ -1,0 +1,23 @@
+[Unit]
+Description=Verity pay-per-correct-answer services
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/verity
+ExecStart=/opt/verity/deploy/start-stack.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/verity/artifacts
+
+[Install]
+WantedBy=multi-user.target
