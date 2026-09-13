@@ -10,6 +10,7 @@ const config: ProviderServiceConfig = {
   assetId: "0.0.0",
   payToAccountId: "0.0.1",
   requestTimeoutMs: 1_000,
+  maxHoldSeconds: 91,
   kind: "fx",
   port: 1,
   fxPrice: "10",

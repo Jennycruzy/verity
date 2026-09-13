@@ -8,7 +8,8 @@ import type { PaymentPayload, PaymentRequirements, SettleResponse } from "@x402/
 const url = required("VERITY_DEMO_PROVIDER_URL");
 const rule = required("VERITY_DEMO_RULE");
 const providerId = required("VERITY_DEMO_PROVIDER_ID");
-const buyerId = required("VERITY_DEMO_BUYER_ROOT");
+const buyerId = process.env.VERITY_DEMO_BUYER_ID?.trim() || required("HEDERA_CLIENT_ACCOUNT_ID");
+const buyerHumanRoot = process.env.VERITY_DEMO_BUYER_ROOT?.trim();
 const requestId = randomUUID();
 const coordinator = createSettlementCoordinator();
 try {
@@ -21,6 +22,7 @@ try {
     bond: process.env.VERITY_DEMO_BOND,
     disputeUrl: process.env.VERITY_DISPUTE_URL,
     requestId,
+    ...(buyerHumanRoot ? { humanRoot: buyerHumanRoot } : {}),
     ...(process.env.VERITY_DEMO_PROVIDER_ROOT?.trim() ? { providerRoot: process.env.VERITY_DEMO_PROVIDER_ROOT.trim() } : {}),
     ...(demoIdentityProof ? { identityProof: demoIdentityProof, identitySignal: required("VERITY_DEMO_IDENTITY_SIGNAL") } : {}),
     ...(demoProviderResponses ? { providerResponses: demoProviderResponses } : {}),

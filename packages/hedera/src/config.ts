@@ -1,3 +1,5 @@
+export const DEFAULT_MAX_HOLD_SECONDS = 91;
+
 export interface RuntimeConfig {
   readonly facilitatorUrl: string;
   readonly network: string;
@@ -11,6 +13,7 @@ export interface RuntimeConfig {
   readonly contentStoreBaseUrl: string;
   readonly hashscanBaseUrl: string;
   readonly requestTimeoutMs: number;
+  readonly maxHoldSeconds: number;
 }
 
 export interface ProviderConfig {
@@ -19,6 +22,7 @@ export interface ProviderConfig {
   readonly assetId: string;
   readonly payToAccountId: string;
   readonly requestTimeoutMs: number;
+  readonly maxHoldSeconds: number;
 }
 
 export interface BuyerConfig {
@@ -28,6 +32,7 @@ export interface BuyerConfig {
   readonly clientPrivateKey: string;
   readonly bondAssetId: string;
   readonly requestTimeoutMs: number;
+  readonly maxHoldSeconds: number;
 }
 
 export interface SettlementConfig {
@@ -39,6 +44,7 @@ export interface SettlementConfig {
   readonly settlementTopicId: string;
   readonly disputeTopicId: string;
   readonly requestTimeoutMs: number;
+  readonly maxHoldSeconds: number;
   readonly escrowContractId?: string;
   readonly escrowGas?: number;
 }
@@ -82,7 +88,8 @@ export function readRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     disputeTopicId: required(env, "HCS_DISPUTE_TOPIC_ID"),
     contentStoreBaseUrl: required(env, "CONTENT_STORE_BASE_URL"),
     hashscanBaseUrl: required(env, "HASHSCAN_BASE_URL"),
-    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000),
+    maxHoldSeconds: readMaxHoldSeconds(env)
   };
 }
 
@@ -99,7 +106,8 @@ export function readProviderConfig(env: NodeJS.ProcessEnv = process.env): Provid
     network: required(env, "HEDERA_NETWORK"),
     assetId: requiredHederaId(env, "HEDERA_ASSET_ID"),
     payToAccountId: requiredHederaId(env, "HEDERA_PAY_TO_ACCOUNT_ID"),
-    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000),
+    maxHoldSeconds: readMaxHoldSeconds(env)
   };
 }
 
@@ -112,7 +120,8 @@ export function readBuyerConfig(env: NodeJS.ProcessEnv = process.env): BuyerConf
     clientAccountId: requiredHederaId(env, "HEDERA_CLIENT_ACCOUNT_ID"),
     clientPrivateKey: required(env, "HEDERA_CLIENT_PRIVATE_KEY"),
     bondAssetId,
-    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000)
+    requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000),
+    maxHoldSeconds: readMaxHoldSeconds(env)
   };
 }
 
@@ -131,8 +140,13 @@ export function readSettlementConfig(env: NodeJS.ProcessEnv = process.env): Sett
     settlementTopicId: required(env, "HCS_SETTLEMENT_TOPIC_ID"),
     disputeTopicId: required(env, "HCS_DISPUTE_TOPIC_ID"),
     requestTimeoutMs: positiveInteger(env, "BLOCKY402_TIMEOUT_MS", 10_000),
+    maxHoldSeconds: readMaxHoldSeconds(env),
     ...(escrowContractId && escrowGas !== undefined ? { escrowContractId, escrowGas } : {})
   };
+}
+
+export function readMaxHoldSeconds(env: NodeJS.ProcessEnv = process.env): number {
+  return positiveInteger(env, "VERITY_MAX_HOLD_SECONDS", DEFAULT_MAX_HOLD_SECONDS);
 }
 
 function requiredHederaId(env: NodeJS.ProcessEnv, name: string): string {

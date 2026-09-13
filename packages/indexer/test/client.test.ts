@@ -74,6 +74,19 @@ test("paid Graph transport rejects an endpoint that skips the payment challenge"
   await assert.rejects(payment.request("https://graph.invalid/query", { method: "POST" }), /VERITY_GRAPH_PAYMENT_REQUIRED/);
 });
 
+test("paid Graph transport rejects a query whose signed transfer hold is too long", async () => {
+  const payment = new X402GraphPayment(
+    new FacilitatorForTest("https://facilitator.invalid"),
+    { network: "hedera:testnet", accountId: "0.0.2", privateKey: PrivateKey.generateECDSA().toStringRaw() },
+    async () => new Response(JSON.stringify({
+      x402Version: 2,
+      resource: { url: "https://graph.invalid", description: "test", mimeType: "application/json" },
+      accepts: [{ scheme: "exact", network: "hedera:testnet", amount: "1", payTo: "0.0.1", maxTimeoutSeconds: 92, asset: "0.0.0", extra: { feePayer: "0.0.999" } }]
+    }), { status: 402 })
+  );
+  await assert.rejects(payment.request("https://graph.invalid", { method: "POST" }), /VERITY_GRAPH_PAYMENT_TIMEOUT_EXCEEDS_HOLD_WINDOW/);
+});
+
 test("paid Graph transport treats an empty price limit as unset", async () => {
   const facilitator = new FacilitatorForTest("https://facilitator.invalid");
   const transport = new X402GraphPayment(facilitator, {

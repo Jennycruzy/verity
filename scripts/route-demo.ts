@@ -9,6 +9,7 @@ const transport = new X402GraphPayment(facilitator, {
   network: buyer.network,
   accountId: buyer.clientAccountId,
   privateKey: buyer.clientPrivateKey,
+  maxHoldSeconds: buyer.maxHoldSeconds,
   ...(process.env.GRAPH_MAX_PRICE?.trim() ? { maxPrice: process.env.GRAPH_MAX_PRICE.trim() } : {})
 });
 const reputation = new GraphReputationClient(

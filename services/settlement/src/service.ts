@@ -1,4 +1,4 @@
-import { Blocky402Client, discoverHederaCapability, type PaymentPayload, type PaymentRequirements, readSettlementConfig } from "@verity/hedera";
+import { Blocky402Client, DEFAULT_MAX_HOLD_SECONDS, discoverHederaCapability, type PaymentPayload, type PaymentRequirements, readSettlementConfig } from "@verity/hedera";
 import { createHederaClient, createVerityEscrowClient, HederaHcsPublisher, type EscrowCallResult, type HcsPublisher } from "@verity/hcs";
 import { sha256, stableJson, type ContentReference, type CrossCheckerVerdict, type DeterministicVerdict, type RuleId } from "@verity/types";
 import { transition, type SettlementState } from "./state.js";
@@ -67,7 +67,8 @@ export class SettlementCoordinator {
     private readonly hcs: HcsPublisher,
     private readonly topics: { settlement: string; dispute: string },
     private readonly escrow?: EscrowSettlementClient,
-    private readonly store: SettlementStore = new MemorySettlementStore()
+    private readonly store: SettlementStore = new MemorySettlementStore(),
+    private readonly maxHoldSeconds = DEFAULT_MAX_HOLD_SECONDS
   ) {}
 
   public settleAccepted(request: SettlementRequest): Promise<SettlementOutcome> {
@@ -242,6 +243,12 @@ export class SettlementCoordinator {
     if (requirements.scheme !== capability.scheme || requirements.network !== capability.network || requirements.extra?.feePayer !== capability.feePayer) {
       throw new Error("VERITY_FEE_PAYER_MISMATCH: payment requirements do not match the facilitator capability");
     }
+    if (!Number.isSafeInteger(requirements.maxTimeoutSeconds) || requirements.maxTimeoutSeconds <= 0) {
+      throw new Error("VERITY_PAYMENT_TIMEOUT_INVALID: payment maxTimeoutSeconds must be a positive integer");
+    }
+    if (requirements.maxTimeoutSeconds > this.maxHoldSeconds) {
+      throw new Error(`VERITY_PAYMENT_TIMEOUT_EXCEEDS_HOLD_WINDOW: payment maxTimeoutSeconds ${requirements.maxTimeoutSeconds} exceeds VERITY_MAX_HOLD_SECONDS ${this.maxHoldSeconds}`);
+    }
   }
 
   private runIdempotently<T>(
@@ -294,7 +301,8 @@ export function createSettlementCoordinator(): SettlementCoordinator {
     hcs,
     { settlement: config.settlementTopicId, dispute: config.disputeTopicId },
     escrow,
-    new FileSettlementStore(storeDirectory)
+    new FileSettlementStore(storeDirectory),
+    config.maxHoldSeconds
   );
 }
 

@@ -1,6 +1,6 @@
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
 import type { Network, PaymentRequired, PaymentRequirements } from "@x402/core/types";
-import { Blocky402Client, discoverHederaCapability } from "@verity/hedera";
+import { Blocky402Client, DEFAULT_MAX_HOLD_SECONDS, discoverHederaCapability } from "@verity/hedera";
 import { normalizeAgent0Id, parseAgent0Buyer, parseAgent0Provider } from "./agent0.js";
 
 export interface ProviderReputation {
@@ -92,6 +92,7 @@ export interface X402GraphPaymentConfig {
   readonly accountId: string;
   readonly privateKey: string;
   readonly maxPrice?: string;
+  readonly maxHoldSeconds?: number;
   readonly requirePayment?: boolean;
 }
 
@@ -113,7 +114,13 @@ export class X402GraphPayment implements GraphQueryTransport {
     }
 
     const paymentRequired = await parsePaymentRequired(unpaid);
-    const requirements = selectPaymentRequirements(paymentRequired, capability.network, this.config.maxPrice, capability.feePayer);
+    const requirements = selectPaymentRequirements(
+      paymentRequired,
+      capability.network,
+      this.config.maxPrice,
+      capability.feePayer,
+      this.config.maxHoldSeconds ?? DEFAULT_MAX_HOLD_SECONDS
+    );
     const [{ x402Client }, { ExactHederaScheme, PrivateKey, createClientHederaSigner }] = await Promise.all([
       import("@x402/core/client"),
       import("@x402/hedera")
@@ -159,7 +166,8 @@ function selectPaymentRequirements(
   paymentRequired: PaymentRequired,
   network: string,
   maxPrice: string | undefined,
-  feePayer: string
+  feePayer: string,
+  maxHoldSeconds: number
 ): PaymentRequirements {
   const requirements = paymentRequired.accepts.find((entry) => entry.network === network && entry.scheme === "exact");
   if (!requirements) throw new Error(`VERITY_GRAPH_PAYMENT_UNSUPPORTED: no exact payment on ${network}`);
@@ -175,6 +183,12 @@ function selectPaymentRequirements(
   }
   if (requirements.extra?.feePayer !== feePayer) {
     throw new Error("VERITY_FEE_PAYER_MISMATCH: graph payment requirements do not match the facilitator capability");
+  }
+  if (!Number.isSafeInteger(requirements.maxTimeoutSeconds) || requirements.maxTimeoutSeconds <= 0) {
+    throw new Error("VERITY_GRAPH_PAYMENT_TIMEOUT_INVALID: query maxTimeoutSeconds must be a positive integer");
+  }
+  if (requirements.maxTimeoutSeconds > maxHoldSeconds) {
+    throw new Error(`VERITY_GRAPH_PAYMENT_TIMEOUT_EXCEEDS_HOLD_WINDOW: query maxTimeoutSeconds ${requirements.maxTimeoutSeconds} exceeds VERITY_MAX_HOLD_SECONDS ${maxHoldSeconds}`);
   }
   return requirements;
 }

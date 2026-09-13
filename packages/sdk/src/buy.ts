@@ -62,7 +62,7 @@ export async function buy(url: string, options: BuyOptions): Promise<BuyResult> 
 
   const paymentRequired = await parsePaymentRequired(unpaidResponse);
   const requirements = selectRequirements(paymentRequired, config.network, options.maxPrice);
-  assertPaymentCapability(requirements, capability.feePayer);
+  assertPaymentCapability(requirements, capability.feePayer, config.maxHoldSeconds);
   const [{ x402Client }, { ExactHederaScheme, PrivateKey, createClientHederaSigner }] = await Promise.all([
     import("@x402/core/client"),
     import("@x402/hedera")
@@ -374,10 +374,16 @@ function selectRequirements(paymentRequired: PaymentRequired, network: string, m
   return requirements;
 }
 
-function assertPaymentCapability(requirements: PaymentRequirements, feePayer: string): void {
+function assertPaymentCapability(requirements: PaymentRequirements, feePayer: string, maxHoldSeconds: number): void {
   const advertisedFeePayer = requirements.extra?.feePayer;
   if (typeof advertisedFeePayer !== "string" || advertisedFeePayer !== feePayer) {
     throw new Error("VERITY_FEE_PAYER_MISMATCH: payment requirements do not match the facilitator capability");
+  }
+  if (!Number.isSafeInteger(requirements.maxTimeoutSeconds) || requirements.maxTimeoutSeconds <= 0) {
+    throw new Error("VERITY_PAYMENT_TIMEOUT_INVALID: resource maxTimeoutSeconds must be a positive integer");
+  }
+  if (requirements.maxTimeoutSeconds > maxHoldSeconds) {
+    throw new Error(`VERITY_PAYMENT_TIMEOUT_EXCEEDS_HOLD_WINDOW: resource maxTimeoutSeconds ${requirements.maxTimeoutSeconds} exceeds VERITY_MAX_HOLD_SECONDS ${maxHoldSeconds}; use a faster resource or a newly measured ceiling`);
   }
 }
 

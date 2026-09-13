@@ -44,6 +44,23 @@ test("anchors an accepted settlement after the facilitator returns a transaction
   assert.equal(published.length, 1);
 });
 
+test("refuses a settlement requirement outside the measured hold window", async () => {
+  const facilitator = new FacilitatorForTest("https://facilitator.invalid");
+  const coordinator = new SettlementCoordinator(
+    facilitator,
+    { publish: async () => "0.0.7@2.000000000" },
+    { settlement: "0.0.7", dispute: "0.0.8" }
+  );
+  await assert.rejects(
+    coordinator.settleAccepted({
+      ...acceptedRequest("request-long-hold"),
+      paymentRequirements: { ...acceptedRequest("request-long-hold").paymentRequirements, maxTimeoutSeconds: 92 }
+    }),
+    /VERITY_PAYMENT_TIMEOUT_EXCEEDS_HOLD_WINDOW/
+  );
+  assert.equal(facilitator.settleCalls, 0);
+});
+
 test("reports the Hedera transaction when HCS anchoring fails", async () => {
   const coordinator = new SettlementCoordinator(
     new FacilitatorForTest("https://facilitator.invalid"),

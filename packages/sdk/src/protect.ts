@@ -46,7 +46,7 @@ export function protect(application: ProtectedApplication, options: ProtectOptio
       network: capability.network as Network,
       amount,
       payTo: config.payToAccountId,
-      maxTimeoutSeconds: resolveTimeout(options.maxTimeoutSeconds),
+      maxTimeoutSeconds: resolveTimeout(options.maxTimeoutSeconds, config.maxHoldSeconds),
       asset: config.assetId,
       extra: { feePayer: capability.feePayer }
     };
@@ -92,10 +92,13 @@ async function resolvePrice(price: PriceResolver, request: ProtectedRequest): Pr
   return value.trim();
 }
 
-function resolveTimeout(value: number | undefined): number {
+function resolveTimeout(value: number | undefined, maxHoldSeconds: number): number {
   const normalized = value ?? DEFAULT_TIMEOUT_SECONDS;
   if (!Number.isSafeInteger(normalized) || normalized <= 0) {
     throw new Error("VERITY_TIMEOUT_INVALID: maxTimeoutSeconds must be a positive integer");
+  }
+  if (normalized > maxHoldSeconds) {
+    throw new Error(`VERITY_TIMEOUT_EXCEEDS_HOLD_WINDOW: maxTimeoutSeconds ${normalized} exceeds VERITY_MAX_HOLD_SECONDS ${maxHoldSeconds}; lower the timeout or measure a new safe ceiling`);
   }
   return normalized;
 }

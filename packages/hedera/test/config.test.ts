@@ -15,10 +15,12 @@ const base = {
 
 test("validates account, asset, bond, and escrow identifiers", () => {
   assert.equal(readProviderConfig(base).payToAccountId, "0.0.3");
+  assert.equal(readProviderConfig(base).maxHoldSeconds, 91);
   assert.equal(readBuyerConfig(base).bondAssetId, "0.0.0");
   assert.equal(readSettlementConfig({ ...base, VERITY_ESCROW_CONTRACT_ID: "0.0.7", VERITY_ESCROW_GAS: "100000" }).escrowContractId, "0.0.7");
   assert.throws(() => readProviderConfig({ ...base, HEDERA_PAY_TO_ACCOUNT_ID: "provider" }), /VERITY_CONFIG_INVALID: HEDERA_PAY_TO_ACCOUNT_ID/);
   assert.throws(() => readProviderConfig({ ...base, HEDERA_ASSET_ID: "token" }), /VERITY_CONFIG_INVALID: HEDERA_ASSET_ID/);
   assert.throws(() => readBuyerConfig({ ...base, VERITY_BOND_ASSET_ID: "asset" }), /VERITY_CONFIG_INVALID: VERITY_BOND_ASSET_ID/);
   assert.throws(() => readSettlementConfig({ ...base, VERITY_ESCROW_CONTRACT_ID: "contract", VERITY_ESCROW_GAS: "100000" }), /VERITY_CONFIG_INVALID: VERITY_ESCROW_CONTRACT_ID/);
+  assert.throws(() => readBuyerConfig({ ...base, VERITY_MAX_HOLD_SECONDS: "0" }), /VERITY_CONFIG_INVALID: VERITY_MAX_HOLD_SECONDS/);
 });

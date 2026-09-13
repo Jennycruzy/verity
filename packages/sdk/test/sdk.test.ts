@@ -62,6 +62,17 @@ test("protect rejects invalid timeout and stake metadata", async () => {
   });
   await assert.rejects(timeoutHandler({ method: "GET", url: "/fx", headers: {} }, response), /VERITY_TIMEOUT_INVALID/);
 
+  const excessiveHandler = protect(async () => {}, {
+    price: "1",
+    verifier: "fx-rate-v1",
+    maxTimeoutSeconds: 92,
+    facilitator: new DiscoveryOnlyFacilitator("https://facilitator.invalid")
+  });
+  await assert.rejects(
+    excessiveHandler({ method: "GET", url: "/fx", headers: {} }, response),
+    /VERITY_TIMEOUT_EXCEEDS_HOLD_WINDOW/
+  );
+
   assert.throws(() => protect(async () => {}, {
     price: "1",
     verifier: "fx-rate-v1",
