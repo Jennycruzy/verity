@@ -18,6 +18,10 @@ fx-secondary.{$VERITY_DOMAIN} {
   reverse_proxy fx-secondary:8080
 }
 
+entity.{$VERITY_DOMAIN} {
+  reverse_proxy entity:8080
+}
+
 checker.{$VERITY_DOMAIN} {
   reverse_proxy checker:3201
 }

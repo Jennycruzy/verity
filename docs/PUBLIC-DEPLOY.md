@@ -12,6 +12,7 @@ disputes.<domain>
 fx.<domain>
 fx-secondary.<domain>
 bad-fx.<domain>
+entity.<domain>
 checker.<domain>
 explorer.<domain>
 reputation.<domain>
@@ -44,6 +45,12 @@ VERITY_DISPUTE_HEALTH_URL=https://disputes.<domain>/health
 VERITY_DEMO_PROVIDER_URL=https://fx.<domain>/fx
 VERITY_DEMO_BAD_PROVIDER_URL=https://bad-fx.<domain>/fx
 VERITY_PROVIDER_PUBLIC_URL=https://fx.<domain>
+
+# Optional Agent0 identity for the entity reference service.
+# Leave blank until the second provider identity is registered.
+VERITY_ENTITY_PROVIDER_PUBLIC_URL=https://entity.<domain>
+VERITY_ENTITY_ERC8004_REGISTRY=<entity-agent-registry-reference>
+VERITY_ENTITY_ERC8004_AGENT_ID=<entity-agent-id>
 
 # Hosted Graph values copied from Graph Studio.
 GRAPH_STUDIO_QUERY_URL=<hosted-studio-query-url>
@@ -97,11 +104,12 @@ docker compose ps
 Check every public service before running a paid request:
 
 ```sh
-for host in content disputes fx fx-secondary bad-fx checker explorer reputation identity; do
+for host in content disputes fx fx-secondary bad-fx entity checker explorer reputation identity; do
   curl --fail --silent --show-error "https://${host}.<domain>/health"
   echo
 done
 curl --include "https://fx.<domain>/fx"
+curl --include "https://entity.<domain>/entity?name=Acme%20Corporation&fresh=true"
 ```
 
 Open `https://identity.<domain>/` to obtain a Proof of Human. Select the configured action, enter the exact signal that the Verity command will submit, approve the request in World App or the simulator, and copy the complete proof JSON from the page. The page verifies the proof with the configured Developer Portal endpoint before showing it. Use `WORLD_ID_ENVIRONMENT=staging` with a staging app and simulator, or `production` with a production app and World App.

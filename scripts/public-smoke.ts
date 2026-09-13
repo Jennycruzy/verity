@@ -12,6 +12,7 @@ const checks = [
   ["fx-health", "fx", "/health"],
   ["bad-fx", "bad-fx", "/health"],
   ["fx-secondary", "fx-secondary", "/health"],
+  ["entity", "entity", "/health"],
   ["checker", "checker", "/health"],
   ["explorer", "explorer", "/health"],
   ["reputation", "reputation", "/health"],
@@ -20,8 +21,11 @@ const checks = [
 ] as const;
 
 const healthResults = await Promise.all(checks.map(([name, service, path]) => checkHealth(name, publicUrl(service, path))));
-const challenge = await checkChallenge(publicUrl("fx", "/fx"));
-const results = [...healthResults, challenge];
+const [fxChallenge, entityChallenge] = await Promise.all([
+  checkChallenge("fx-payment-challenge", publicUrl("fx", "/fx")),
+  checkChallenge("entity-payment-challenge", publicUrl("entity", "/entity?name=Acme%20Corporation&fresh=true"))
+]);
+const results = [...healthResults, fxChallenge, entityChallenge];
 console.log(JSON.stringify({ domain, results }, null, 2));
 if (results.some((result) => result.state === "failed")) process.exitCode = 1;
 
@@ -36,8 +40,7 @@ async function checkHealth(name: string, url: string): Promise<SmokeResult> {
   }
 }
 
-async function checkChallenge(url: string): Promise<SmokeResult> {
-  const name = "fx-payment-challenge";
+async function checkChallenge(name: string, url: string): Promise<SmokeResult> {
   try {
     const response = await fetchWithTimeout(url);
     const hasChallenge = Boolean(response.headers.get("payment-required"));

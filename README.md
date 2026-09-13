@@ -116,7 +116,7 @@ Set the `HEDERA_TOKEN_*` fields first. The command writes the created token ID t
 
 ## Run the reference services
 
-For a public deployment, point the base domain and the eight service subdomains in `deploy/Caddyfile` at a server, set `VERITY_DOMAIN`, and run `docker compose up -d --build`. Caddy obtains TLS certificates automatically. The compose file runs the honest and degradable providers separately, includes the independent Go checker, persists content and dispute records in named volumes, and does not copy `.env` into an image. A small server is operational hosting, not a blockchain funding requirement. See [docs/PUBLIC-DEPLOY.md](docs/PUBLIC-DEPLOY.md) for the secure copy-paste runbook.
+For a public deployment, point the base domain and the service subdomains in `deploy/Caddyfile` at a server, set `VERITY_DOMAIN`, and run `docker compose up -d --build`. Caddy obtains TLS certificates automatically. The compose file runs honest FX, degradable FX, secondary FX, and entity-resolution providers separately, includes the independent Go checker, persists content and dispute records in named volumes, and does not copy `.env` into an image. A small server is operational hosting, not a blockchain funding requirement. See [docs/PUBLIC-DEPLOY.md](docs/PUBLIC-DEPLOY.md) for the secure copy-paste runbook.
 
 After DNS and TLS are ready, `npm run public:check` probes every public health endpoint and asserts that the FX resource returns an x402 `402` challenge with a `payment-required` header. It exits non-zero if any service is unreachable or if the resource accidentally becomes free.
 
@@ -134,13 +134,14 @@ The provider process serves the paid endpoint and an unauthenticated determinist
 PROVIDER_KIND=fx PORT=3101 npm --workspace @verity/providers start
 PROVIDER_KIND=fx PORT=3102 DEGRADE_MODE=true DEGRADED_FX_RATE=0.50 npm --workspace @verity/providers start
 PROVIDER_KIND=fx PORT=3103 npm --workspace @verity/providers start
+PROVIDER_KIND=entity PORT=3104 npm --workspace @verity/providers start
 ```
 
-The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. The checker endpoint is `POST /check` with `{ "ruleId": "...", "value": { ... } }`. The provider process validates inputs and returns the same deterministic verdict used by the buyer.
+The paid FX endpoint is `/fx`; the entity endpoint is `/entity`. Entity lookups use `?name=...` and charge the cached or fresh configured amount based on the observed `fresh=true` request. The checker endpoint is `POST /check` with `{ "ruleId": "...", "value": { ... } }`. The provider process validates inputs and returns the same deterministic verdict used by the buyer.
 
 The quorum can include the separate Go implementation in `services/checker-go`, which does not import the Node provider or Verity rule package. Configure `CHECKER_PORT`, `CHECKER_ID`, and `CHECKER_MAX_BODY_BYTES`, then run `npm run checker:go`. Its `/check` endpoint uses exact rational arithmetic for `fx-rate-v1` and returns the same published verdict schema.
 
-The public compose deployment keeps the degradable `bad-fx` process out of adjudication. It runs a second honest FX process plus the separate Go checker, so the three votes are produced by two independently started Node processes and a different implementation. The Go service must receive `CHECKER_ID=fx-independent-go` in deployment configuration.
+The public compose deployment keeps the degradable `bad-fx` process out of adjudication. It runs a second honest FX process plus the separate Go checker, so the three votes are produced by two independently started Node processes and a different implementation. The entity service is a separate paid reference market with variable cached/fresh pricing; it is not used as an FX checker. The Go service must receive `CHECKER_ID=fx-independent-go` in deployment configuration.
 
 Provider operators can enable buyer admission with `VERITY_BUYER_REPUTATION_ENDPOINT`, `VERITY_BUYER_REPUTATION_API_KEY`, `VERITY_BUYER_REPUTATION_QUERY_FILE`, `VERITY_BUYER_REPUTATION_ROOT_STORE_PATH`, `VERITY_BUYER_REPUTATION_MIN_HONESTY`, `WORLD_ID_VERIFY_URL`, and `WORLD_ID_DISPUTE_ACTION`. The provider verifies the buyer's World proof from the request headers, compares the proof-derived identity commitment to the claimed human root, persists proof replay protection, queries the hosted Agent0 score, and refuses delivery when the score is below policy. `buy()` sends those headers when `humanRoot`, `identityProof`, and `identitySignal` are supplied. Missing proof and unavailable Graph data fail closed; no local score is substituted.
 
