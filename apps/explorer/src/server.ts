@@ -19,7 +19,8 @@ const client = new GraphReputationClient(
   config.graphApiKey
 );
 const server = createExplorerServer(client);
-server.listen(config.port, () => console.log(JSON.stringify({ port: config.port, source: "graph" })));
+const host = process.env.EXPLORER_HOST?.trim() || process.env.VERITY_BIND_HOST?.trim() || "0.0.0.0";
+server.listen(config.port, host, () => console.log(JSON.stringify({ host, port: config.port, source: "graph" })));
 
 function resolveProjectPath(value: string): string {
   return isAbsolute(value) ? value : resolve(projectRoot, value);

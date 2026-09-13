@@ -20,11 +20,25 @@ export function readExplorerConfig(env: NodeJS.ProcessEnv = process.env): Explor
   if (!Number.isSafeInteger(port) || port <= 0) throw new Error("VERITY_EXPLORER_CONFIG_INVALID: EXPLORER_PORT must be a positive integer");
   return {
     port,
-    graphEndpoint: required(env, "GRAPH_SUBGRAPH_URL"),
+    graphEndpoint: requiredUrl(env, env.EXPLORER_GRAPH_URL?.trim() || env.GRAPH_STUDIO_QUERY_URL?.trim(), "EXPLORER_GRAPH_URL or GRAPH_STUDIO_QUERY_URL"),
     ...(env.GRAPH_API_KEY?.trim() ? { graphApiKey: env.GRAPH_API_KEY.trim() } : {}),
     providerQueryFile: required(env, "GRAPH_PROVIDER_QUERY_FILE"),
     buyerQueryFile: required(env, "GRAPH_BUYER_QUERY_FILE")
   };
+}
+
+function requiredUrl(env: NodeJS.ProcessEnv, value: string | undefined, name: string): string {
+  if (!value) throw new Error(`VERITY_EXPLORER_CONFIG_MISSING: ${name} is required`);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch (error) {
+    throw new Error(`VERITY_EXPLORER_CONFIG_INVALID: ${name} must be an absolute HTTP(S) URL`, { cause: error });
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`VERITY_EXPLORER_CONFIG_INVALID: ${name} must be an absolute HTTP(S) URL`);
+  }
+  return url.toString();
 }
 
 export async function readQueryFile(path: string): Promise<ReputationQuery> {

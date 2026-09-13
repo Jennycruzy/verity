@@ -71,6 +71,9 @@ test("serves an operator proof page without exposing the signing key", async () 
   assert.match(result.body(), /@worldcoin\/idkit-core@4\.2\.4\/dist\/idkit\.global\.js/);
   assert.match(result.body(), /qrcodejs@1\.0\.0\/qrcode\.min\.js/);
   assert.match(result.body(), /World ID request QR code/);
+  assert.match(result.body(), /data-verity-build="qr-flow"/);
+  assert.match(result.body(), /Scan or open the request/);
+  assert.match(result.body(), /VERITY_WORLD_CONNECTOR_MISSING/);
   assert.doesNotMatch(result.body(), /1111111111111111111111111111111111111111111111111111111111111111/);
 });
 

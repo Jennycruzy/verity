@@ -30,4 +30,5 @@ const processor = new DisputeProcessor(
   new FileDisputeStore(config.disputeStoreDirectory)
 );
 const server = createDisputeServer(processor, { maxBodyBytes: config.maxBodyBytes });
-server.listen(config.port, () => console.log(JSON.stringify({ port: config.port, source: "disputes" })));
+const host = process.env.DISPUTES_HOST?.trim() || process.env.VERITY_BIND_HOST?.trim() || "0.0.0.0";
+server.listen(config.port, host, () => console.log(JSON.stringify({ host, port: config.port, source: "disputes" })));

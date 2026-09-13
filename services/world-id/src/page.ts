@@ -23,12 +23,17 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       .note { color: #9cb0d0; line-height: 1.5; }
       .error { color: #ff9e9e; }
       .hidden { display: none; }
+      .request-panel { margin-top: 24px; padding: 20px; border: 1px solid #29415d; border-radius: 12px; background: #0a1824; }
+      .qr { width: 280px; min-height: 40px; margin: 16px auto; padding: 16px; border-radius: 8px; background: #fff; }
+      .qr img, .qr canvas { display: block; max-width: 100%; margin: auto; }
+      .connector-value { max-height: 120px; margin: 16px 0 0; }
     </style>
   </head>
   <body>
-    <main>
+    <main data-verity-build="qr-flow">
       <h1>Verity Proof of Human</h1>
       <p class="note">This operator page obtains a World ID proof bound to the exact signal that a Verity command will verify. The proof is shown locally so you can copy the complete JSON into your ignored <code>.env</code>; never put signing keys there or in chat.</p>
+      <p class="note">Desktop flow: click <strong>Open World ID</strong>. The QR request appears here after IDKit creates it; scan it with World App or open the request link in the staging simulator.</p>
       <p id="modeNote" class="note"></p>
       <label id="actionLabel" for="action">World action</label>
       <input id="action" value="verity-dispute" autocomplete="off">
@@ -41,8 +46,13 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       </div>
       <button id="start">Open World ID</button>
       <p id="status" class="note" aria-live="polite"></p>
-      <p><a id="connector" hidden target="_blank" rel="noreferrer">Open the World ID request</a></p>
-      <div id="qr" hidden aria-label="World ID request QR code"></div>
+      <section id="requestPanel" class="request-panel" hidden aria-live="polite">
+        <h2>Scan or open the request</h2>
+        <p id="qrStatus" class="note">Preparing the QR request…</p>
+        <div id="qr" class="qr" hidden aria-label="World ID request QR code"></div>
+        <p><a id="connector" hidden target="_blank" rel="noreferrer">Open the World ID request</a></p>
+        <pre id="connectorValue" class="connector-value hidden"></pre>
+      </section>
       <label for="proof">Complete IDKit proof JSON</label>
       <textarea id="proof" readonly></textarea>
       <label for="verification">Developer Portal verification response</label>
@@ -59,8 +69,11 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       const sessionIdInput = document.getElementById('sessionId');
       const startButton = document.getElementById('start');
       const statusOutput = document.getElementById('status');
+      const requestPanel = document.getElementById('requestPanel');
+      const qrStatus = document.getElementById('qrStatus');
       const connector = document.getElementById('connector');
       const qr = document.getElementById('qr');
+      const connectorValue = document.getElementById('connectorValue');
       const proofOutput = document.getElementById('proof');
       const verificationOutput = document.getElementById('verification');
 
@@ -83,8 +96,12 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
           return;
         }
         startButton.disabled = true;
+        requestPanel.hidden = true;
         connector.hidden = true;
         qr.hidden = true;
+        connectorValue.className = 'connector-value hidden';
+        connectorValue.textContent = '';
+        qrStatus.className = 'note';
         proofOutput.value = '';
         verificationOutput.textContent = '';
         statusOutput.className = 'note';
@@ -127,13 +144,28 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
               environment: signature.environment
             }).preset(window.IDKit.proofOfHuman({ signal }));
           }
-          connector.href = request.connectorURI;
+          const connectorURI = typeof request.connectorURI === 'string' ? request.connectorURI.trim() : '';
+          if (!connectorURI) throw new Error('VERITY_WORLD_CONNECTOR_MISSING: IDKit did not return a request URL; reload and try again.');
+          requestPanel.hidden = false;
+          connector.href = connectorURI;
           connector.textContent = 'Open the World ID request in World App';
-          connector.hidden = !request.connectorURI;
-          if (request.connectorURI && window.QRCode && qr) {
+          connector.hidden = false;
+          connectorValue.textContent = connectorURI;
+          connectorValue.className = 'connector-value';
+          if (window.QRCode && qr) {
             qr.textContent = '';
-            new window.QRCode(qr, { text: request.connectorURI, width: 280, height: 280, correctLevel: window.QRCode.CorrectLevel.M });
-            qr.hidden = false;
+            try {
+              new window.QRCode(qr, { text: connectorURI, width: 280, height: 280, correctLevel: window.QRCode.CorrectLevel.M });
+              qrStatus.textContent = 'Scan this QR code with World App, or use the request link below.';
+              qr.hidden = false;
+            } catch (error) {
+              qrStatus.textContent = 'The QR renderer failed; use the request link below or open the staging simulator.';
+              qrStatus.className = 'error';
+              console.error('Verity QR render failed', error);
+            }
+          } else {
+            qrStatus.textContent = 'The QR renderer did not load; use the request link below or open the staging simulator.';
+            qrStatus.className = 'error';
           }
           statusOutput.textContent = 'Approve the request in World App or the simulator; this page is polling for completion.';
           const completion = await request.pollUntilCompletion({ pollInterval: 2000, timeout: 120000 });

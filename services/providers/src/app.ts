@@ -216,8 +216,9 @@ class CheckerBodyTooLargeError extends Error {
 
 export function startProvider(config: ProviderServiceConfig, buyerReputation?: BuyerReputationPolicy): ReturnType<typeof createServer> {
   const server = createProviderServer(config, buyerReputation);
-  server.listen(config.port, () => {
-    console.log(JSON.stringify({ provider: config.kind, port: config.port, degradeMode: config.degradeMode }));
+  const host = process.env.PROVIDER_HOST?.trim() || process.env.VERITY_BIND_HOST?.trim() || "0.0.0.0";
+  server.listen(config.port, host, () => {
+    console.log(JSON.stringify({ host, provider: config.kind, port: config.port, degradeMode: config.degradeMode }));
   });
   return server;
 }

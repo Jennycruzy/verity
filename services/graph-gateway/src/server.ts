@@ -6,6 +6,8 @@ import { readGraphGatewayConfig } from "./config.js";
 loadDotenv({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
 const config = readGraphGatewayConfig();
-createGraphGatewayServer(config).listen(config.port, () => {
-  process.stdout.write(`Verity Graph gateway listening on ${config.port}\n`);
+const host = process.env.GRAPH_GATEWAY_HOST?.trim() || process.env.VERITY_BIND_HOST?.trim() || "0.0.0.0";
+
+createGraphGatewayServer(config).listen(config.port, host, () => {
+  process.stdout.write(`Verity Graph gateway listening on http://${host}:${config.port}\n`);
 });
