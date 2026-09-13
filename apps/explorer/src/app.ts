@@ -96,6 +96,17 @@ const explorerPage = `<!doctype html>
       .demo button:disabled { cursor: wait; opacity: .6; }
       .demo-result { display: none; margin-top: 22px; }
       .demo-result.visible { display: block; }
+      .live-receipt-card { position: relative; padding: 22px; border: 1px solid #5adcae; border-radius: 16px; background: #071511; box-shadow: inset 0 1px #ffffff12; animation: receipt-in .45s cubic-bezier(.2,.8,.25,1) both; }
+      .live-receipt-card::after { content: '✓'; position: absolute; top: 18px; right: 22px; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #61e8b5; border-radius: 50%; color: #61e8b5; font-size: 1.2rem; }
+      .signed-label { color: #61e8b5; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+      .settled-label { margin: 20px 0 4px; color: #effff8; font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; letter-spacing: -.04em; }
+      .receipt-note { margin: 0 42px 20px 0; color: #9fc5b7; font-size: .8rem; }
+      .live-receipt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0 0 18px; border: 1px solid #29473e; border-radius: 10px; overflow: hidden; background: #29473e; }
+      .live-receipt-grid div { min-width: 0; padding: 12px; background: #0b1b16; color: #77958a; font-size: .68rem; }
+      .live-receipt-grid strong { display: block; margin-top: 5px; overflow: hidden; color: #eafff7; font-size: .78rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+      .receipt-proof-links { display: flex; flex-wrap: wrap; gap: 8px; }
+      .receipt-proof-links a { padding: 9px 11px; border: 1px solid #326b58; border-radius: 8px; background: #0d211b; font-size: .74rem; font-weight: 700; text-decoration: none; }
+      .demo-error { color: #ffb4a8; }
       .proof-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; overflow: hidden; margin-top: 22px; border: 1px solid #29473e; border-radius: 12px; background: #29473e; }
       .proof-strip div { padding: 13px; background: #081310; color: #819b91; font-size: .7rem; }
       .proof-strip strong { display: block; margin-top: 4px; color: #eafff7; font-size: .78rem; }
@@ -128,6 +139,7 @@ const explorerPage = `<!doctype html>
       @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes float { 0%,100% { transform: rotate(2deg) translateY(0); } 50% { transform: rotate(1deg) translateY(-8px); } }
       @keyframes pulse { 0% { box-shadow: 0 0 0 0 #61e8b566; } 70%,100% { box-shadow: 0 0 0 10px #61e8b500; } }
+      @keyframes receipt-in { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
       @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
       @media (max-width: 760px) { nav { margin-bottom: 48px; } .hero { grid-template-columns: 1fr; } .receipt { transform: none; } .principles { grid-template-columns: 1fr; margin-top: 48px; } .demo-head { align-items: stretch; flex-direction: column; } .proof-strip { grid-template-columns: 1fr 1fr; } .controls { flex-direction: column; } button { width: 100%; } }
     </style>
@@ -162,7 +174,7 @@ const explorerPage = `<!doctype html>
           <button id="run-demo">Run live purchase</button>
         </div>
         <div class="proof-strip"><div>1 · Challenge<strong>HTTP 402</strong></div><div>2 · Delivery<strong>Real provider</strong></div><div>3 · Decision<strong>Published rule</strong></div><div>4 · Evidence<strong>HashScan + HCS</strong></div></div>
-        <pre class="demo-result" id="demo-result" aria-live="polite"></pre>
+        <div class="demo-result" id="demo-result" aria-live="polite"></div>
       </div>
       <div class="grid reveal delay-2">
         <section>
@@ -187,19 +199,47 @@ const explorerPage = `<!doctype html>
       demoButton.addEventListener('click', async () => {
         const output = document.getElementById('demo-result');
         output.classList.add('visible');
+        output.classList.remove('demo-error');
         output.textContent = 'Requesting paid data → checking answer → settling on Hedera…';
         demoButton.disabled = true;
         try {
           const response = await fetch('/demo/honest', { method: 'POST' });
           const body = await response.json();
           if (!response.ok) throw new Error(body.error || 'live purchase failed');
-          output.textContent = JSON.stringify(body, null, 2);
+          output.innerHTML = renderReceipt(body);
         } catch (error) {
+          output.classList.add('demo-error');
           output.textContent = error instanceof Error ? error.message : String(error);
         } finally {
           demoButton.disabled = false;
         }
       });
+      function renderReceipt(body) {
+        const events = Array.isArray(body.events) ? body.events : [];
+        const settlementEvent = events.find((event) => event && event.settlement && event.settlement.transaction);
+        const verdictEvent = events.find((event) => event && event.verdict);
+        const settlement = settlementEvent?.settlement || {};
+        const verdict = verdictEvent?.verdict || {};
+        const requestId = settlementEvent?.requestId || verdictEvent?.requestId || 'unavailable';
+        const payment = settlement.transaction || 'unavailable';
+        const hcs = settlementEvent?.hcsTransactionId || 'unavailable';
+        const scan = (value) => 'https://hashscan.io/testnet/transaction/' + encodeURIComponent(value);
+        const link = (value, label) => value === 'unavailable' ? '<span>' + label + ' pending</span>' : '<a href="' + scan(value) + '" target="_blank" rel="noreferrer">' + label + ' ↗</a>';
+        return '<article class="live-receipt-card">' +
+          '<div class="signed-label">Signed settlement receipt · Hedera testnet</div>' +
+          '<div class="settled-label">SETTLED · ' + escapeReceipt(verdict.reasonCode || 'verified') + '</div>' +
+          '<p class="receipt-note">The buyer signed the payment, the answer passed <code>' + escapeReceipt(verdict.ruleId || 'published rule') + '</code>, and Hedera consensus anchored the result.</p>' +
+          '<div class="live-receipt-grid">' +
+            '<div>Decision<strong>' + escapeReceipt(verdict.verdict || 'accept') + '</strong></div>' +
+            '<div>Network<strong>' + escapeReceipt(settlement.network || 'hedera:testnet') + '</strong></div>' +
+            '<div>Request<strong>' + escapeReceipt(requestId) + '</strong></div>' +
+          '</div>' +
+          '<div class="receipt-proof-links">' + link(payment, 'Payment transaction') + link(hcs, 'HCS receipt') + '</div>' +
+        '</article>';
+      }
+      function escapeReceipt(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+      }
       for (const button of document.querySelectorAll('button[data-kind]')) {
         button.addEventListener('click', async () => {
           const kind = button.dataset.kind;
