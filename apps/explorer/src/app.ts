@@ -239,11 +239,12 @@ const explorerPage = `<!doctype html>
         const events = Array.isArray(body.events) ? body.events : [];
         const settlementEvent = events.find((event) => event && event.settlement && event.settlement.transaction);
         const verdictEvent = events.find((event) => event && event.verdict);
+        const hcsEvent = events.find((event) => event && event.hcsTransactionId);
         const settlement = settlementEvent?.settlement || {};
         const verdict = verdictEvent?.verdict || {};
         const requestId = settlementEvent?.requestId || verdictEvent?.requestId || 'unavailable';
         const payment = settlement.transaction || 'unavailable';
-        const hcs = settlementEvent?.hcsTransactionId || 'unavailable';
+        const hcs = hcsEvent?.hcsTransactionId || 'unavailable';
         const scan = (value) => 'https://hashscan.io/testnet/transaction/' + encodeURIComponent(value);
         const link = (value, label) => value === 'unavailable' ? '<span>' + label + ' pending</span>' : '<a href="' + scan(value) + '" target="_blank" rel="noreferrer">' + label + ' ↗</a>';
         return '<article class="live-receipt-card">' +
