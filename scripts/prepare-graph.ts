@@ -27,7 +27,7 @@ if (network !== "base-sepolia") {
 const rpcUrl = requiredUrl("GRAPH_FEEDBACK_RPC_URL");
 const identityRegistryInput = required("GRAPH_FEEDBACK_IDENTITY_REGISTRY");
 const reputationRegistryInput = required("GRAPH_FEEDBACK_REPUTATION_REGISTRY");
-const startBlock = optionalDecimal("GRAPH_SUBSTREAM_START_BLOCK") ?? "0";
+const configuredStartBlock = optionalDecimal("GRAPH_SUBSTREAM_START_BLOCK");
 const provider = new JsonRpcProvider(rpcUrl, undefined, { staticNetwork: false });
 
 try {
@@ -42,6 +42,7 @@ try {
   if (reputationCode === "0x") {
     throw new Error(`VERITY_GRAPH_REPUTATION_REGISTRY_NOT_DEPLOYED: no bytecode at ${reputationRegistry}`);
   }
+  const startBlock = configuredStartBlock ?? await discoverStartBlock(provider, [identityRegistry, reputationRegistry]);
 
   const packageTemplate = await readFile(substreamsTemplatePath, "utf8");
   const packageManifest = replaceTokens(packageTemplate, {
@@ -63,7 +64,10 @@ try {
 
   const template = await readFile(templatePath, "utf8");
   const rendered = replaceTokens(template, {
-    GRAPH_SUBGRAPH_NETWORK: network
+    GRAPH_SUBGRAPH_NETWORK: network,
+    GRAPH_AGENT0_IDENTITY_REGISTRY: identityRegistry,
+    GRAPH_AGENT0_REPUTATION_REGISTRY: reputationRegistry,
+    GRAPH_SUBGRAPH_START_BLOCK: startBlock
   });
   await writeFile(outputPath, rendered, "utf8");
   const configTemplate = await readFile(configTemplatePath, "utf8");
@@ -108,6 +112,24 @@ function optionalDecimal(name: string): string | undefined {
   if (!value) return undefined;
   if (!/^\d+$/.test(value)) throw new Error(`VERITY_CONFIG_INVALID: ${name} must be a non-negative integer`);
   return BigInt(value).toString(10);
+}
+
+async function discoverStartBlock(provider: JsonRpcProvider, addresses: readonly string[]): Promise<string> {
+  const latest = await provider.getBlockNumber();
+  const starts = await Promise.all(addresses.map((address) => discoverContractStartBlock(provider, address, latest)));
+  return Math.min(...starts).toString(10);
+}
+
+async function discoverContractStartBlock(provider: JsonRpcProvider, address: string, latest: number): Promise<number> {
+  let low = 0;
+  let high = latest;
+  while (low < high) {
+    const midpoint = Math.floor((low + high) / 2);
+    const code = await provider.getCode(address, midpoint);
+    if (code === "0x") low = midpoint + 1;
+    else high = midpoint;
+  }
+  return low;
 }
 
 function replaceTokens(source: string, values: Readonly<Record<string, string>>): string {

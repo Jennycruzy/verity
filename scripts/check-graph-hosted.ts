@@ -2,7 +2,9 @@ import "dotenv/config";
 
 const endpoint = requiredUrl("GRAPH_STUDIO_QUERY_URL");
 const apiKey = process.env.GRAPH_API_KEY?.trim() || process.env.GRAPH_GATEWAY_UPSTREAM_API_KEY?.trim();
-if (!apiKey) throw new Error("VERITY_GRAPH_HOSTED_KEY_MISSING: set GRAPH_API_KEY or GRAPH_GATEWAY_UPSTREAM_API_KEY");
+if (!apiKey && !isStudioEndpoint(endpoint)) {
+  throw new Error("VERITY_GRAPH_HOSTED_KEY_MISSING: set GRAPH_API_KEY or GRAPH_GATEWAY_UPSTREAM_API_KEY for non-Studio Graph endpoints");
+}
 
 const timeoutMs = positiveInteger(process.env.GRAPH_GATEWAY_TIMEOUT_MS?.trim() || "10000", "GRAPH_GATEWAY_TIMEOUT_MS");
 const controller = new AbortController();
@@ -12,7 +14,7 @@ try {
     method: "POST",
     signal: controller.signal,
     headers: {
-      authorization: `Bearer ${apiKey}`,
+      ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       "content-type": "application/json"
     },
     body: JSON.stringify({ query: "query VerityHostedReadiness { _meta { block { number } } }" })
@@ -22,7 +24,7 @@ try {
   if (!response.ok) throw new Error(`VERITY_GRAPH_HOSTED_HTTP: endpoint returned HTTP ${response.status}`);
   if (hasErrors(body)) throw new Error(`VERITY_GRAPH_HOSTED_QUERY: ${JSON.stringify(body.errors)}`);
   const blockNumber = readBlockNumber(body);
-  console.log(JSON.stringify({ state: "ready", endpoint, blockNumber }, null, 2));
+  console.log(JSON.stringify({ state: "ready", endpoint, blockNumber, authentication: apiKey ? "bearer" : "studio-anonymous" }, null, 2));
 } catch (error) {
   if (error instanceof Error && error.name === "AbortError") {
     throw new Error(`VERITY_GRAPH_HOSTED_TIMEOUT: endpoint exceeded ${timeoutMs}ms`, { cause: error });
@@ -43,6 +45,10 @@ function requiredUrl(name: string): string {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`VERITY_CONFIG_INVALID: ${name} must use HTTP(S)`);
   return url.toString();
+}
+
+function isStudioEndpoint(value: string): boolean {
+  return new URL(value).hostname === "api.studio.thegraph.com";
 }
 
 function positiveInteger(value: string, name: string): number {

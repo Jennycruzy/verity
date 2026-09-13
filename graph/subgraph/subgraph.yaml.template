@@ -7,41 +7,50 @@ schema:
   file: ./schema.graphql
 
 dataSources:
-  - kind: substreams
-    name: agent0Identity
+  - kind: ethereum/contract
+    name: IdentityRegistry
     network: ${GRAPH_SUBGRAPH_NETWORK}
     source:
-      package:
-        moduleName: identity_events
-        file: ../substreams/build/verity-agent-feedback-v0.1.0.spkg
+      address: "${GRAPH_AGENT0_IDENTITY_REGISTRY}"
+      abi: IdentityRegistry
+      startBlock: ${GRAPH_SUBGRAPH_START_BLOCK}
     mapping:
+      kind: ethereum/events
       apiVersion: 0.0.7
-      kind: substreams/graph-entities
-      file: ./src/mapping.ts
-      handler: handleIdentityEvents
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - AgentRegistrationFile
+      abis:
+        - name: IdentityRegistry
+          file: ./abis/IdentityRegistry.json
+      eventHandlers:
+        - event: Registered(indexed uint256,string,indexed address)
+          handler: handleRegistered
+        - event: URIUpdated(indexed uint256,string,indexed address)
+          handler: handleURIUpdated
+      file: ./src/mapping-evm.ts
 
-  - kind: substreams
-    name: agent0Feedback
+  - kind: ethereum/contract
+    name: ReputationRegistry
     network: ${GRAPH_SUBGRAPH_NETWORK}
     source:
-      package:
-        moduleName: feedback_events
-        file: ../substreams/build/verity-agent-feedback-v0.1.0.spkg
+      address: "${GRAPH_AGENT0_REPUTATION_REGISTRY}"
+      abi: ReputationRegistry
+      startBlock: ${GRAPH_SUBGRAPH_START_BLOCK}
     mapping:
+      kind: ethereum/events
       apiVersion: 0.0.7
-      kind: substreams/graph-entities
-      file: ./src/mapping.ts
-      handler: handleFeedbackEvents
-
-  - kind: substreams
-    name: agent0FeedbackRevocations
-    network: ${GRAPH_SUBGRAPH_NETWORK}
-    source:
-      package:
-        moduleName: feedback_revocations
-        file: ../substreams/build/verity-agent-feedback-v0.1.0.spkg
-    mapping:
-      apiVersion: 0.0.7
-      kind: substreams/graph-entities
-      file: ./src/mapping.ts
-      handler: handleRevocationEvents
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+        - Feedback
+      abis:
+        - name: ReputationRegistry
+          file: ./abis/ReputationRegistry.json
+      eventHandlers:
+        - event: NewFeedback(indexed uint256,indexed address,uint64,int128,uint8,indexed string,string,string,string,string,bytes32)
+          handler: handleNewFeedback
+        - event: FeedbackRevoked(indexed uint256,indexed address,indexed uint64)
+          handler: handleFeedbackRevoked
+      file: ./src/mapping-evm.ts

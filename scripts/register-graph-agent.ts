@@ -33,7 +33,7 @@ const fields = role === "provider"
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
 const rpcUrl = requiredUrl("GRAPH_FEEDBACK_RPC_URL");
 const provider = await resolveRegistry(rpcUrl, required("GRAPH_FEEDBACK_IDENTITY_REGISTRY"));
-const endpoint = requiredUrl(fields.endpoint);
+const endpoint = role === "provider" ? requiredUrl(fields.endpoint) : optionalUrl(fields.endpoint);
 const privateKey = required(fields.privateKey);
 const existingAgentId = optional(fields.agentId);
 const existingRegistrationTx = optional(fields.registrationTx);
@@ -75,7 +75,7 @@ try {
     registryAddress: provider.address,
     agentId,
     signerAddress: client.signerAddress,
-    endpoint,
+    ...(endpoint ? { endpoint } : {}),
     agentUri,
     registrationTransactionId,
     agentUriTransactionId,
@@ -87,13 +87,15 @@ try {
   await client.close();
 }
 
-function createAgentUri(role: "provider" | "buyer", endpoint: string, registry: string, agentId: string): string {
+function createAgentUri(role: "provider" | "buyer", endpoint: string | undefined, registry: string, agentId: string): string {
   const registration = createErc8004Registration({
     name: role === "provider" ? `Verity Graph provider ${agentId}` : `Verity Graph buyer ${agentId}`,
     description: role === "provider"
       ? "A Verity provider whose objectively verifiable responses are scored from HCS dispute outcomes."
       : "A Verity buyer whose dispute honesty is scored from HCS adjudication outcomes.",
-    services: [{ name: "web", endpoint, version: "1" }],
+    services: endpoint
+      ? [{ name: "web", endpoint, version: "1" }]
+      : [{ name: "agent-registry", endpoint: registry, version: "1" }],
     x402Support: role === "provider",
     active: true,
     registrations: [{ agentRegistry: registry, agentId }],
@@ -130,6 +132,12 @@ function requiredUrl(name: string): string {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`VERITY_CONFIG_INVALID: ${name} must use HTTP(S)`);
   return url.toString();
+}
+
+function optionalUrl(name: string): string | undefined {
+  const value = optional(name);
+  if (!value) return undefined;
+  return requiredUrl(name);
 }
 
 async function resolveRegistry(rpcUrl: string, value: string) {

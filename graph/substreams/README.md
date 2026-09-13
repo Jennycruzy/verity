@@ -6,9 +6,12 @@ module. The committed manifest is generic for source review. `npm run
 graph:prepare` renders an ignored deployment manifest with the configured
 identity and reputation registry addresses, then packs that filtered source.
 
-The package is consumed by `../subgraph/subgraph.yaml` as a
-Substreams-powered Subgraph. The package does not contain payment or
-reputation fixtures.
+The package is published independently from the hosted EVM Subgraph. Graph
+Studio currently rejects Substreams-powered Subgraphs, so the hosted Subgraph
+indexes the same ERC-8004 contracts with standard EVM event handlers while
+this package provides the high-throughput composed stream for Graph Market.
+Both products use the same Agent0 registry addresses and event schema. The
+package does not contain payment or reputation fixtures.
 
 ## Validate and pack
 
