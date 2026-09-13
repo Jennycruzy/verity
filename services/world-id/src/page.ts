@@ -79,6 +79,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode, environment:
       const connectorValue = document.getElementById('connectorValue');
       const proofOutput = document.getElementById('proof');
       const verificationOutput = document.getElementById('verification');
+      const identityBasePath = location.pathname === '/identity' || location.pathname.startsWith('/identity/') ? '/identity' : '';
 
       environmentNote.textContent = environment === 'production'
         ? 'Environment: production. A real World ID credential is required.'
@@ -115,7 +116,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode, environment:
         try {
           if (!window.IDKit) throw new Error('IDKit did not load; check the browser network connection and reload.');
           statusOutput.textContent = 'Requesting a signed context…';
-          const signatureResponse = await fetch('/rp-signature', {
+          const signatureResponse = await fetch(identityBasePath + '/rp-signature', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(sessionMode
@@ -187,7 +188,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode, environment:
           if (sessionMode && completion.result.session_id) sessionIdInput.value = completion.result.session_id;
           proofOutput.value = JSON.stringify(completion.result, null, 2);
           statusOutput.textContent = 'Proof received. Verifying it with the configured Developer Portal endpoint…';
-          const verificationResponse = await fetch('/verify-proof', {
+          const verificationResponse = await fetch(identityBasePath + '/verify-proof', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ idkitResponse: completion.result })

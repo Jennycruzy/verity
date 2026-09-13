@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 import test from "node:test";
 import { handleWorldIdRequest } from "../src/app.ts";
+import { renderWorldIdProofPage } from "../src/page.ts";
 import type { WorldIdServiceConfig } from "../src/config.ts";
 
 const config: WorldIdServiceConfig = {
@@ -86,6 +87,13 @@ test("serves the configured session proof workflow", async () => {
   assert.match(result.body(), /IDKit\.createSession/);
   assert.match(result.body(), /IDKit\.proveSession/);
   assert.match(result.body(), /session commitment becomes the durable human root/);
+});
+
+test("makes proof API requests base-path aware for a single-host ingress", () => {
+  const page = renderWorldIdProofPage("session", "staging");
+  assert.match(page, /identityBasePath/);
+  assert.match(page, /identityBasePath \+ '\/rp-signature'/);
+  assert.match(page, /identityBasePath \+ '\/verify-proof'/);
 });
 
 function requestForTest(path: string, body: string, method = "POST"): Readable & { method: string; url: string; headers: Record<string, string> } {
