@@ -7,7 +7,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Verity identity proof</title>
-    <script src="https://cdn.jsdelivr.net/npm/@worldcoin/idkit-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@worldcoin/idkit-core@4.2.4/dist/idkit.global.js"></script>
     <style>
       :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #08131a; color: #e8f0ff; }
       body { margin: 0; padding: 32px; }

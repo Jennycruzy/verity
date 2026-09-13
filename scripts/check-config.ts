@@ -82,7 +82,6 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     required("GRAPH_SUBGRAPH_URL", "graph", "paid public Graph query endpoint"),
     required("GRAPH_STUDIO_QUERY_URL", "graph", "hosted Graph Studio query endpoint"),
     required("GRAPH_GATEWAY_PRICE", "graph", "paid Graph query amount in tinybars"),
-    required("GRAPH_GATEWAY_UPSTREAM_API_KEY", "graph", "server-side hosted Graph credential"),
     required("GRAPH_PROVIDER_QUERY_FILE", "graph", "Agent0 provider query file"),
     required("GRAPH_BUYER_QUERY_FILE", "graph", "human-root buyer query file"),
     required("GRAPH_FEEDBACK_RPC_URL", "graph", "EVM RPC for Agent0 identity and feedback"),
@@ -98,6 +97,7 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
     required("GRAPH_STUDIO_DEPLOY_KEY", "graph", "Graph Studio deploy key is set locally; value is never printed"),
     required("GRAPH_STUDIO_VERSION_LABEL", "graph", "Graph Studio deployment version label")
   ];
+  checks.push(graphGatewayCredential(env));
 
   const contractId = env.VERITY_ESCROW_CONTRACT_ID?.trim();
   const gas = env.VERITY_ESCROW_GAS?.trim();
@@ -212,6 +212,39 @@ function inspectConfig(env: NodeJS.ProcessEnv): readonly ConfigCheck[] {
   }
 
   return checks;
+}
+
+function graphGatewayCredential(env: NodeJS.ProcessEnv): ConfigCheck {
+  if (env.GRAPH_GATEWAY_UPSTREAM_API_KEY?.trim()) {
+    return {
+      key: "GRAPH_GATEWAY_UPSTREAM_API_KEY",
+      state: "ready",
+      scope: "graph",
+      detail: "server-side hosted Graph credential is set locally; value is never printed"
+    };
+  }
+  const url = env.GRAPH_STUDIO_QUERY_URL?.trim();
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "https:" && parsed.hostname === "api.studio.thegraph.com") {
+        return {
+          key: "GRAPH_GATEWAY_UPSTREAM_API_KEY",
+          state: "ready",
+          scope: "graph",
+          detail: "optional for the live anonymous Graph Studio endpoint; set one for other upstreams"
+        };
+      }
+    } catch {
+      // The URL-specific check reports the malformed value separately.
+    }
+  }
+  return {
+    key: "GRAPH_GATEWAY_UPSTREAM_API_KEY",
+    state: "missing",
+    scope: "graph",
+    detail: "server-side hosted Graph credential; required unless the upstream is the live Graph Studio endpoint"
+  };
 }
 
 async function inspectFacilitator(env: NodeJS.ProcessEnv): Promise<{ readonly state: CheckState; readonly detail: string; readonly capability?: unknown }> {

@@ -57,6 +57,17 @@ test("requires a live hosted Graph block for readiness", async () => {
   assert.equal(authorization, "Bearer private-token");
 });
 
+test("does not send an empty authorization header for anonymous Studio access", async () => {
+  let authorization: string | null = "present";
+  const anonymousConfig: GraphGatewayConfig = { ...config, upstreamApiKey: undefined };
+  const result = await checkGraphReadiness(anonymousConfig, async (_input, init) => {
+    authorization = new Headers(init?.headers).get("authorization");
+    return new Response(JSON.stringify({ data: { _meta: { block: { number: "12345" } } } }), { status: 200 });
+  });
+  assert.deepEqual(result, { blockNumber: "12345" });
+  assert.equal(authorization, null);
+});
+
 test("fails readiness when the hosted Graph reports an error", async () => {
   await assert.rejects(
     checkGraphReadiness(config, async () => new Response(JSON.stringify({ errors: [{ message: "subgraph unavailable" }] }), { status: 200 })),

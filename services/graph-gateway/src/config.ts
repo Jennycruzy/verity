@@ -4,18 +4,28 @@ export interface GraphGatewayConfig {
   readonly maxBodyBytes: number;
   readonly requestTimeoutMs: number;
   readonly subgraphUrl: string;
-  readonly upstreamApiKey: string;
+  readonly upstreamApiKey?: string;
 }
 
 export function readGraphGatewayConfig(env: NodeJS.ProcessEnv = process.env): GraphGatewayConfig {
+  const subgraphUrl = httpUrl(env, "GRAPH_STUDIO_QUERY_URL");
+  const upstreamApiKey = env.GRAPH_GATEWAY_UPSTREAM_API_KEY?.trim();
+  if (!upstreamApiKey && !allowsAnonymousStudioQueries(subgraphUrl)) {
+    throw new Error("VERITY_GRAPH_GATEWAY_CONFIG_MISSING: GRAPH_GATEWAY_UPSTREAM_API_KEY is required unless GRAPH_STUDIO_QUERY_URL is the hosted Studio endpoint");
+  }
   return {
     port: positiveInteger(env, "GRAPH_GATEWAY_PORT"),
     price: positiveAmount(env, "GRAPH_GATEWAY_PRICE"),
     maxBodyBytes: optionalPositiveInteger(env, "GRAPH_GATEWAY_MAX_BODY_BYTES", 65_536),
     requestTimeoutMs: optionalPositiveInteger(env, "GRAPH_GATEWAY_TIMEOUT_MS", 10_000),
-    subgraphUrl: httpUrl(env, "GRAPH_STUDIO_QUERY_URL"),
-    upstreamApiKey: required(env, "GRAPH_GATEWAY_UPSTREAM_API_KEY")
+    subgraphUrl,
+    ...(upstreamApiKey ? { upstreamApiKey } : {})
   };
+}
+
+function allowsAnonymousStudioQueries(value: string): boolean {
+  const parsed = new URL(value);
+  return parsed.protocol === "https:" && parsed.hostname === "api.studio.thegraph.com";
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {

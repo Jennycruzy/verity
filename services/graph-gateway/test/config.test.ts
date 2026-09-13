@@ -23,3 +23,17 @@ test("reads a complete Graph gateway configuration", () => {
 test("rejects an unsafe upstream URL", () => {
   assert.throws(() => readGraphGatewayConfig({ ...valid, GRAPH_STUDIO_QUERY_URL: "file:///tmp/query" }), /GRAPH_STUDIO_QUERY_URL/);
 });
+
+test("allows the live Studio endpoint without a gateway credential", () => {
+  const { upstreamApiKey, ...anonymous } = readGraphGatewayConfig({
+    ...valid,
+    GRAPH_STUDIO_QUERY_URL: "https://api.studio.thegraph.com/query/1760236/verity/0.1.1",
+    GRAPH_GATEWAY_UPSTREAM_API_KEY: ""
+  });
+  assert.equal(upstreamApiKey, undefined);
+  assert.equal(anonymous.subgraphUrl, "https://api.studio.thegraph.com/query/1760236/verity/0.1.1");
+});
+
+test("requires a credential for non-Studio upstreams", () => {
+  assert.throws(() => readGraphGatewayConfig({ ...valid, GRAPH_GATEWAY_UPSTREAM_API_KEY: "" }), /GRAPH_GATEWAY_UPSTREAM_API_KEY/);
+});

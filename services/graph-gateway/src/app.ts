@@ -34,10 +34,7 @@ export async function checkGraphReadiness(config: GraphGatewayConfig, fetchImpl:
     const response = await fetchImpl(config.subgraphUrl, {
       method: "POST",
       signal: controller.signal,
-      headers: {
-        authorization: `Bearer ${config.upstreamApiKey}`,
-        "content-type": "application/json"
-      },
+      headers: upstreamHeaders(config),
       body: JSON.stringify({ query: GRAPH_READINESS_QUERY })
     });
     const raw = await response.text();
@@ -70,10 +67,7 @@ export function createGraphQueryHandler(config: GraphGatewayConfig, fetchImpl: t
       const upstream = await fetchImpl(config.subgraphUrl, {
         method: "POST",
         signal: controller.signal,
-        headers: {
-          "authorization": `Bearer ${config.upstreamApiKey}`,
-          "content-type": "application/json"
-        },
+        headers: upstreamHeaders(config),
         body: JSON.stringify(body)
       });
       const text = await upstream.text();
@@ -176,6 +170,13 @@ function readBlockNumber(value: unknown): string {
 
 function pathOf(url: string): string {
   return url.split("?", 1)[0] ?? "/";
+}
+
+function upstreamHeaders(config: GraphGatewayConfig): Record<string, string> {
+  return {
+    ...(config.upstreamApiKey ? { authorization: `Bearer ${config.upstreamApiKey}` } : {}),
+    "content-type": "application/json"
+  };
 }
 
 function statusFor(error: unknown): number {
