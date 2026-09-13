@@ -187,7 +187,7 @@ DISPUTE_CHECKERS_JSON='[{"id":"fx-node-a","url":"http://127.0.0.1:3101/check"},{
 npm run disputes:start
 ```
 
-The service accepts `POST /disputes` and requires an idempotency key matching `disputeId`. It verifies the bond through Mirror Node before reading content or running adjudication.
+The service accepts `POST /disputes` and requires an idempotency key matching `disputeId`. It verifies the bond through Mirror Node before reading content or running adjudication. Settlement outcomes are also journaled under `VERITY_SETTLEMENT_STORE_DIR`, so a restart can return a completed result without submitting the same payment again.
 
 ## Escrow and provider stake
 

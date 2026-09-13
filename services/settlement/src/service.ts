@@ -2,6 +2,7 @@ import { Blocky402Client, discoverHederaCapability, type PaymentPayload, type Pa
 import { createHederaClient, createVerityEscrowClient, HederaHcsPublisher, type EscrowCallResult, type HcsPublisher } from "@verity/hcs";
 import { sha256, stableJson, type ContentReference, type CrossCheckerVerdict, type DeterministicVerdict, type RuleId } from "@verity/types";
 import { transition, type SettlementState } from "./state.js";
+import { FileSettlementStore, MemorySettlementStore, type SettlementOperation, type SettlementStore } from "./store.js";
 
 export interface SettlementRequest {
   readonly requestId: string;
@@ -65,15 +66,16 @@ export class SettlementCoordinator {
     private readonly facilitator: Blocky402Client,
     private readonly hcs: HcsPublisher,
     private readonly topics: { settlement: string; dispute: string },
-    private readonly escrow?: EscrowSettlementClient
+    private readonly escrow?: EscrowSettlementClient,
+    private readonly store: SettlementStore = new MemorySettlementStore()
   ) {}
 
   public settleAccepted(request: SettlementRequest): Promise<SettlementOutcome> {
-    return this.runIdempotently(this.accepted, request.requestId, request, () => this.settleAcceptedInternal(request));
+    return this.runIdempotently(this.accepted, "accepted", request.requestId, request, () => this.settleAcceptedInternal(request));
   }
 
   public recordAdjudication(request: DisputeResolutionRequest): Promise<SettlementOutcome> {
-    return this.runIdempotently(this.adjudications, request.disputeId, request, () => this.recordAdjudicationInternal(request));
+    return this.runIdempotently(this.adjudications, "adjudication", request.disputeId, request, () => this.recordAdjudicationInternal(request));
   }
 
   public close(): void {
@@ -244,9 +246,10 @@ export class SettlementCoordinator {
 
   private runIdempotently<T>(
     operations: Map<string, PendingSettlement<T>>,
+    operationKind: SettlementOperation,
     key: string,
     request: unknown,
-    operation: () => Promise<T>
+    run: () => Promise<T>
   ): Promise<T> {
     if (!key.trim()) throw new Error("VERITY_SETTLEMENT_IDEMPOTENCY_KEY_MISSING: request key must be non-empty");
     const requestHash = sha256(stableJson(request));
@@ -255,9 +258,25 @@ export class SettlementCoordinator {
       if (existing.requestHash !== requestHash) throw new SettlementIdempotencyConflictError(key);
       return existing.promise;
     }
-    const promise = operation();
+    const promise = this.readStoredOrRun(operationKind, key, requestHash, run);
     operations.set(key, { requestHash, promise });
     return promise;
+  }
+
+  private async readStoredOrRun<T>(
+    operation: SettlementOperation,
+    key: string,
+    requestHash: string,
+    run: () => Promise<T>
+  ): Promise<T> {
+    const stored = await this.store.get(operation, key);
+    if (stored) {
+      if (stored.requestHash !== requestHash) throw new SettlementIdempotencyConflictError(key);
+      return stored.outcome as T;
+    }
+    const outcome = await run();
+    await this.store.put(operation, key, { requestHash, outcome: outcome as SettlementOutcome });
+    return outcome;
   }
 }
 
@@ -269,7 +288,14 @@ export function createSettlementCoordinator(): SettlementCoordinator {
   const escrow = config.escrowContractId && config.escrowGas !== undefined
     ? createVerityEscrowClient(hederaClient, config.escrowContractId, config.escrowGas)
     : undefined;
-  return new SettlementCoordinator(client, hcs, { settlement: config.settlementTopicId, dispute: config.disputeTopicId }, escrow);
+  const storeDirectory = process.env.VERITY_SETTLEMENT_STORE_DIR?.trim() || "artifacts/settlements";
+  return new SettlementCoordinator(
+    client,
+    hcs,
+    { settlement: config.settlementTopicId, dispute: config.disputeTopicId },
+    escrow,
+    new FileSettlementStore(storeDirectory)
+  );
 }
 
 async function resolveEscrow(

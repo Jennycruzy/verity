@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Blocky402Client } from "@verity/hedera";
 import { encodeHcsRecord } from "@verity/hcs";
-import { SettlementCoordinator } from "../src/service.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { FileSettlementStore, SettlementCoordinator } from "../src/index.ts";
 
 class FacilitatorForTest extends Blocky402Client {
   public settleCalls = 0;
@@ -89,6 +92,36 @@ test("rejects a changed retry for an already settled request", async () => {
     /VERITY_SETTLEMENT_IDEMPOTENCY_CONFLICT/
   );
   assert.equal(facilitator.settleCalls, 1);
+});
+
+test("returns a completed payment from the journal after a coordinator restart", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "verity-settlements-"));
+  try {
+    const request = acceptedRequest("request-restart");
+    const firstFacilitator = new FacilitatorForTest("https://facilitator.invalid");
+    const first = new SettlementCoordinator(
+      firstFacilitator,
+      { publish: async () => "0.0.7@2.000000000" },
+      { settlement: "0.0.7", dispute: "0.0.8" },
+      undefined,
+      new FileSettlementStore(directory)
+    );
+    const expected = await first.settleAccepted(request);
+
+    const secondFacilitator = new FacilitatorForTest("https://facilitator.invalid");
+    const second = new SettlementCoordinator(
+      secondFacilitator,
+      { publish: async () => { throw new Error("journal replay must not publish HCS"); } },
+      { settlement: "0.0.7", dispute: "0.0.8" },
+      undefined,
+      new FileSettlementStore(directory)
+    );
+    assert.deepEqual(await second.settleAccepted(request), expected);
+    assert.equal(firstFacilitator.settleCalls, 1);
+    assert.equal(secondFacilitator.settleCalls, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("closes an owned HCS publisher when the coordinator shuts down", () => {
