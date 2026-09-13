@@ -23,7 +23,7 @@ export async function handleWorldIdRequest(
     response.statusCode = 200;
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.setHeader("cache-control", "no-store");
-    response.end(renderWorldIdProofPage(config.proofMode ?? "uniqueness"));
+    response.end(renderWorldIdProofPage(config.proofMode ?? "uniqueness", config.environment));
     return;
   }
   if (request.method === "GET" && path === "/health") {

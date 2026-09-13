@@ -1,6 +1,6 @@
 import type { WorldIdProofMode } from "@verity/agent";
 
-export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
+export function renderWorldIdProofPage(proofMode: WorldIdProofMode, environment: "production" | "staging" | "sandbox" = "production"): string {
   return String.raw`<!doctype html>
 <html lang="en">
   <head>
@@ -34,6 +34,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       <h1>Verity Proof of Human</h1>
       <p class="note">This operator page obtains a World ID proof bound to the exact signal that a Verity command will verify. The proof is shown locally so you can copy the complete JSON into your ignored <code>.env</code>; never put signing keys there or in chat.</p>
       <p class="note">Desktop flow: click <strong>Open World ID</strong>. The QR request appears here after IDKit creates it; scan it with World App or open the request link in the staging simulator.</p>
+      <p id="environmentNote" class="note"></p>
       <p id="modeNote" class="note"></p>
       <label id="actionLabel" for="action">World action</label>
       <input id="action" value="verity-dispute" autocomplete="off">
@@ -60,8 +61,10 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
     </main>
     <script>
       const proofMode = ${JSON.stringify(proofMode)};
+      const environment = ${JSON.stringify(environment)};
       const sessionMode = proofMode === 'session';
       const modeNote = document.getElementById('modeNote');
+      const environmentNote = document.getElementById('environmentNote');
       const actionLabel = document.getElementById('actionLabel');
       const actionInput = document.getElementById('action');
       const signalInput = document.getElementById('signal');
@@ -76,6 +79,10 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       const connectorValue = document.getElementById('connectorValue');
       const proofOutput = document.getElementById('proof');
       const verificationOutput = document.getElementById('verification');
+
+      environmentNote.textContent = environment === 'production'
+        ? 'Environment: production. A real World ID credential is required.'
+        : 'Environment: ' + environment + '. This proof is for integration testing and is not production human-uniqueness evidence.';
 
       if (sessionMode) {
         modeNote.textContent = 'Session mode is enabled: the session commitment becomes the durable human root shared by provider registration and disputes.';
@@ -148,7 +155,9 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
           if (!connectorURI) throw new Error('VERITY_WORLD_CONNECTOR_MISSING: IDKit did not return a request URL; reload and try again.');
           requestPanel.hidden = false;
           connector.href = connectorURI;
-          connector.textContent = 'Open the World ID request in World App';
+          connector.textContent = environment === 'staging'
+            ? 'Open the staging World ID simulator request'
+            : 'Open the World ID request in World App';
           connector.hidden = false;
           connectorValue.textContent = connectorURI;
           connectorValue.className = 'connector-value';

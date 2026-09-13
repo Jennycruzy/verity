@@ -74,6 +74,7 @@ test("serves an operator proof page without exposing the signing key", async () 
   assert.match(result.body(), /data-verity-build="qr-flow"/);
   assert.match(result.body(), /Scan or open the request/);
   assert.match(result.body(), /VERITY_WORLD_CONNECTOR_MISSING/);
+  assert.match(result.body(), /const environment = "staging"/);
   assert.doesNotMatch(result.body(), /1111111111111111111111111111111111111111111111111111111111111111/);
 });
 
