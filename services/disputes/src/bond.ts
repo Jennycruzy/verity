@@ -71,7 +71,7 @@ export class MirrorBondVerifier implements BondVerifier {
     }
     if (value.result !== "SUCCESS") throw new Error(`VERITY_BOND_NOT_VERIFIED: transaction ${input.transactionId} did not succeed`);
     if (value.contract_id !== this.escrowContractId) throw new Error("VERITY_BOND_CONTRACT_MISMATCH: bond transaction targeted another contract");
-    if (String(value.from).toLowerCase() !== input.buyerAddress.toLowerCase()) throw new Error("VERITY_BOND_CALLER_MISMATCH: bond was not posted by the buyer address");
+    if (!await mirrorCallerMatches(this.baseUrl, String(value.from), input.buyerAddress, this.fetchImpl)) throw new Error("VERITY_BOND_CALLER_MISMATCH: bond was not posted by the buyer address");
     if (String(value.amount) !== input.amountTinybars) throw new Error("VERITY_BOND_AMOUNT_MISMATCH: posted amount does not match the dispute bond");
     if (typeof value.function_parameters !== "string") throw new Error("VERITY_BOND_PARAMETERS_MISSING: contract result omitted function parameters");
     const functionParameters = value.function_parameters.toLowerCase();
@@ -127,7 +127,7 @@ export class MirrorStakeVerifier implements StakeVerifier {
     }
     if (value.result !== "SUCCESS") throw new Error(`VERITY_STAKE_NOT_VERIFIED: transaction ${input.transactionId} did not succeed`);
     if (value.contract_id !== this.escrowContractId) throw new Error("VERITY_STAKE_CONTRACT_MISMATCH: stake transaction targeted another contract");
-    if (String(value.from).toLowerCase() !== input.providerAddress.toLowerCase()) throw new Error("VERITY_STAKE_CALLER_MISMATCH: stake was not posted by the provider address");
+    if (!await mirrorCallerMatches(this.baseUrl, String(value.from), input.providerAddress, this.fetchImpl)) throw new Error("VERITY_STAKE_CALLER_MISMATCH: stake was not posted by the provider address");
     if (String(value.amount) !== input.amountTinybars) throw new Error("VERITY_STAKE_AMOUNT_MISMATCH: posted amount does not match the provider stake");
     if (typeof value.function_parameters !== "string") throw new Error("VERITY_STAKE_PARAMETERS_MISSING: contract result omitted function parameters");
     const functionParameters = value.function_parameters.toLowerCase();
@@ -156,6 +156,49 @@ export function toMirrorTransactionId(value: string): string {
 
 function bytes32Hex(value: string): string {
   return `0x${Buffer.from(toBytes32(value)).toString("hex")}`;
+}
+
+function normalizeMirrorEvmAddress(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(normalized) && !/^0x[0-9a-f]{64}$/.test(normalized)) {
+    throw new Error("VERITY_MIRROR_EVM_ADDRESS_INVALID: expected a 20-byte address or a left-padded 32-byte address");
+  }
+  const address = `0x${normalized.slice(-40)}`;
+  if (normalized.length === 66 && !/^0x0{24}/.test(normalized)) {
+    throw new Error("VERITY_MIRROR_EVM_ADDRESS_INVALID: 32-byte address was not left padded");
+  }
+  return address;
+}
+
+async function mirrorCallerMatches(baseUrl: string, mirrorCaller: string, configuredAddress: string, fetchImpl: typeof fetch): Promise<boolean> {
+  const caller = normalizeMirrorEvmAddress(mirrorCaller);
+  const configured = normalizeMirrorEvmAddress(configuredAddress);
+  if (caller === configured) return true;
+  const response = await fetchImpl(`${baseUrl}/accounts/${encodeURIComponent(configured)}`);
+  if (!response.ok) return false;
+  let value: unknown;
+  try {
+    value = JSON.parse(await response.text());
+  } catch (error) {
+    throw new Error("VERITY_CALLER_ACCOUNT_MIRROR_JSON: Mirror Node returned invalid account JSON", { cause: error });
+  }
+  if (!value || typeof value !== "object") return false;
+  const account = value as { account?: unknown; evm_address?: unknown };
+  if (typeof account.account !== "string" || typeof account.evm_address !== "string") return false;
+  if (normalizeMirrorEvmAddress(account.evm_address) !== configured) return false;
+  return caller === solidityAddressFromAccountId(account.account);
+}
+
+function solidityAddressFromAccountId(value: string): string {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value);
+  if (!match?.[1] || !match[2] || !match[3]) throw new Error("VERITY_MIRROR_ACCOUNT_ID_INVALID: Mirror Node returned an invalid Hedera account ID");
+  const shard = BigInt(match[1]);
+  const realm = BigInt(match[2]);
+  const number = BigInt(match[3]);
+  if (shard > 0xffffffffn || realm > 0xffffffffffffffffn || number > 0xffffffffffffffffn) {
+    throw new Error("VERITY_MIRROR_ACCOUNT_ID_INVALID: Hedera account ID exceeds Solidity address bounds");
+  }
+  return `0x${shard.toString(16).padStart(8, "0")}${realm.toString(16).padStart(16, "0")}${number.toString(16).padStart(16, "0")}`;
 }
 
 function assertPositiveExpiry(value: unknown): void {

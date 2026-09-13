@@ -241,6 +241,10 @@ The buyer calls the provider, receives the response, evaluates it locally, and s
 
 Live honest-path evidence from 2026-09-12:
 
+- The public explorer's **Run live purchase** button created request `f5a5eef8-7ff7-4014-a100-52bbea0f0c9e`, returned `RATE_WITHIN_TOLERANCE`, settled through [Blocky402](https://hashscan.io/testnet/transaction/0.0.7162784@1789307385.390679735), and anchored its [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789307389.005164094) on 2026-09-13. This browser workflow uses a bounded server-side agent signer; no key is sent to the browser.
+- Public Lightsail request `cdea3463-db37-411d-ae4b-543e37e41b64` evaluated `RATE_WITHIN_TOLERANCE` against `https://verity.54-154-121-30.sslip.io/provider/fx` on 2026-09-13.
+- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789304983.267202853) and [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789304986.304165422) prove the publicly hosted path end to end.
+
 - Request `9cd9993d-c4f5-4445-a14e-6cb23ef74d5a` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08` on 2026-09-13.
 - [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789283686.210609392) and [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789283687.523085878) are independently resolvable.
 
@@ -289,9 +293,12 @@ Live Hedera Testnet records:
 | Settlement topic | `0.0.10501385` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501385) |
 | Dispute topic | `0.0.10501386` | [HashScan](https://hashscan.io/testnet/topic/0.0.10501386) |
 | Bond escrow | `0.0.10502300` | [Contract](https://hashscan.io/testnet/contract/0.0.10502300) · [Creation transaction](https://hashscan.io/testnet/transaction/0.0.10472838@1789221045.369240725) |
+| Provider stake | `verity-fx-reference-v1` | [Stake transaction](https://hashscan.io/testnet/transaction/0.0.10501091@1789306145.776916903) · [HCS provider record](https://hashscan.io/testnet/transaction/0.0.10501091@1789306148.696381853) |
 | Honest FX settlement | `1302814f-dcff-4653-8a64-4964cb0e975c` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) |
 | Latest honest FX settlement | `a7353260-8829-445e-ad23-d6f23baa3bae` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789245767.729586729) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789245772.571672131) |
 | Post-hardening honest FX settlement | `0721bd9e-332c-416f-8cde-4d091164e8a6` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789252458.310034075) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789252461.678940522) |
+| Public Lightsail FX settlement | `cdea3463-db37-411d-ae4b-543e37e41b64` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789304983.267202853) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789304986.304165422) |
+| Interactive website settlement | `f5a5eef8-7ff7-4014-a100-52bbea0f0c9e` | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789307385.390679735) · [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789307389.005164094) |
 | Signed-transfer measurement | 100 seconds settled; 101 seconds expired | [100-second settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789224054.629001290) · [run record](docs/HOLD-WINDOW.md) |
 
 A replayable dispute ID will be added only after a complete live rejection is recorded.
@@ -308,7 +315,7 @@ The resource server delivers before settlement, so the payment hold must survive
 | Independent checker implementation | `services/checker-go/main.go:1` | Go checker tested independently and verified over live local HTTP |
 | HCS payment/dispute audit | `packages/hcs/src/` and `services/settlement/src/service.ts:1` | Implemented; settlement and dispute topics live on testnet |
 | Mirror Node replay | `packages/replay/src/index.ts:1` | Implemented and tested |
-| Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed on testnet; provider stake remains to be posted |
+| Bond and provider stake | `contracts/src/VerityBondEscrow.sol:1` and `packages/hcs/src/escrow.ts:1` | Escrow deployed and provider stake independently verified on testnet |
 | Proof of Human root | `packages/agent/src/identity.ts:1` | Session and uniqueness proof verification implemented; World credentials/config required |
 | Two-sided reputation anchor | `contracts/src/VerityBondEscrow.sol:1` | On-chain anchor deployed; public score indexing remains |
 | Graph composition and MCP/SKILL tooling | `graph/substreams/substreams.yaml.template:1`, `graph/subgraph/subgraph.yaml.template:1`, `services/graph-gateway/src/app.ts:1`, `packages/indexer/src/mcp.ts:1`, and `skills/verity-reputation/SKILL.md:1` | Standard EVM Subgraph deployed to Studio; v0.1.1 has live provider/buyer Agent0 identities indexed and v0.1.2 contains the endpoint projection fix; Substreams package, paid query service, routing, MCP handler, and reusable skill implemented; Graph Market publication and feedback-backed scores remain |
@@ -318,7 +325,7 @@ The resource server delivers before settlement, so the payment hold must survive
 
 ## Limitations
 
-Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, and content storage is file-backed. The standard EVM Subgraph is hosted in Studio on Base Sepolia; v0.1.1 contains live provider and buyer Agent0 registration entities, while corrected v0.1.2 is syncing the endpoint projection fix. Feedback-backed scores still require the real adjudication run; the separate Substreams package has not yet been published through Graph Market. ERC-8004 registration is wired to the published EVM registry interface and the Base Sepolia provider/buyer identities are live. World ID verification requires the operator's configured app, RP, signing key, and proof; session mode is the durable-root path, while uniqueness mode is action-scoped. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption, a real replayable dispute, public hosting, the demo video, and the Harness PR remain outstanding.
+Verity applies only where a ground-truth rule can be written and replayed. The reference market is small, the checker quorum is small, and content storage is file-backed on the public Verity host rather than a neutral permanent store. The standard EVM Subgraph is hosted in Studio on Base Sepolia; corrected v0.1.2 is synced and contains the live provider and buyer Agent0 registration entities. Feedback-backed scores still require the real adjudication run; the separate Substreams package has not yet been published through Graph Market. ERC-8004 registration is wired to the published EVM registry interface and the Base Sepolia provider/buyer identities are live. World ID verification requires the operator's configured app, RP, signing key, and proof; the recorded staging proof demonstrates integration but is not production proof of uniqueness. The HTS token command and scheduled bond expiry are optional and each require a live testnet transaction. External provider adoption, a real replayable dispute, and the demo video remain outstanding. The [Hedera Harness capability-discovery PR](https://github.com/hedera-dev/hedera-harness/pull/80) is open for upstream review.
 
 ## Adoption
 

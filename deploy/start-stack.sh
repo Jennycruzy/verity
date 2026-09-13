@@ -25,7 +25,7 @@ start env CHECKER_PORT=3201 CHECKER_ID=fx-independent-go CHECKER_MAX_BODY_BYTES=
 start node services/content/dist/server.js
 start node services/disputes/dist/server.js
 start node services/graph-gateway/dist/server.js
-start node apps/explorer/dist/server.js
+start env EXPLORER_INTERACTIVE_DEMO=true EXPLORER_DEMO_COOLDOWN_MS=30000 EXPLORER_DEMO_TIMEOUT_MS=80000 node apps/explorer/dist/server.js
 start env PUBLIC_INGRESS_PORT=18080 node --import tsx scripts/public-ingress.ts
 
 wait -n

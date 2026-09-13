@@ -1,13 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { ReputationClient } from "@verity/indexer";
+import type { DemoRunner } from "./demo-runner.js";
 
-export function createExplorerServer(client: ReputationClient) {
-  const handler = createExplorerHandler(client);
+export function createExplorerServer(client: ReputationClient, demo?: DemoRunner) {
+  const handler = createExplorerHandler(client, demo);
   return createServer(handler);
 }
 
-export function createExplorerHandler(client: ReputationClient) {
-  return async (request: Pick<IncomingMessage, "url">, response: ServerResponse) => {
+export function createExplorerHandler(client: ReputationClient, demo?: DemoRunner) {
+  return async (request: Pick<IncomingMessage, "url" | "method">, response: ServerResponse) => {
     const path = request.url?.split("?", 1)[0] ?? "/";
     if (path === "/" || path === "/index.html") {
       writeHtml(response, 200, explorerPage);
@@ -19,6 +20,12 @@ export function createExplorerHandler(client: ReputationClient) {
     }
     const query = new URLSearchParams(request.url?.split("?", 2)[1] ?? "");
     try {
+      if (path === "/demo/honest") {
+        if (request.method !== "POST") return writeJson(response, 405, { error: "method_not_allowed" });
+        if (!demo) return writeJson(response, 503, { error: "interactive_demo_unavailable" });
+        writeJson(response, 200, await demo.runHonestPurchase());
+        return;
+      }
       if (path === "/provider") {
         const agentId = query.get("agentId");
         if (!agentId) return writeJson(response, 400, { error: "agentId_required" });
@@ -81,6 +88,17 @@ const explorerPage = `<!doctype html>
       .flow span { padding: 8px 11px; border: 1px solid #29473e; border-radius: 8px; background: #0b1815; }
       .flow b { color: #61e8b5; }
       .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 36px; }
+      .demo { margin-top: 54px; padding: 28px; border: 1px solid #4a806e; border-radius: 22px; background: linear-gradient(135deg, #112b23e8, #0a1613e8); box-shadow: 0 28px 90px #02080799; }
+      .demo-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+      .demo h2 { margin: 0 0 8px; font-family: 'Space Grotesk', sans-serif; font-size: clamp(1.7rem, 4vw, 2.7rem); letter-spacing: -.04em; }
+      .demo p { margin: 0; }
+      .demo button { min-width: 210px; padding: 15px 20px; box-shadow: 0 12px 36px #61e8b52c; }
+      .demo button:disabled { cursor: wait; opacity: .6; }
+      .demo-result { display: none; margin-top: 22px; }
+      .demo-result.visible { display: block; }
+      .proof-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; overflow: hidden; margin-top: 22px; border: 1px solid #29473e; border-radius: 12px; background: #29473e; }
+      .proof-strip div { padding: 13px; background: #081310; color: #819b91; font-size: .7rem; }
+      .proof-strip strong { display: block; margin-top: 4px; color: #eafff7; font-size: .78rem; }
       .receipt { position: relative; padding: 24px; border: 1px solid #315a4c; border-radius: 22px; background: linear-gradient(145deg, #10251fdd, #081310ee); box-shadow: 0 30px 100px #020706, inset 0 1px #ffffff12; transform: rotate(2deg); animation: float 5s ease-in-out infinite; }
       .receipt::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: linear-gradient(130deg, #78efc1, transparent 42%); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; }
       .receipt-head { display: flex; justify-content: space-between; align-items: center; color: #819b91; font-size: .7rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
@@ -111,7 +129,7 @@ const explorerPage = `<!doctype html>
       @keyframes float { 0%,100% { transform: rotate(2deg) translateY(0); } 50% { transform: rotate(1deg) translateY(-8px); } }
       @keyframes pulse { 0% { box-shadow: 0 0 0 0 #61e8b566; } 70%,100% { box-shadow: 0 0 0 10px #61e8b500; } }
       @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
-      @media (max-width: 760px) { nav { margin-bottom: 48px; } .hero { grid-template-columns: 1fr; } .receipt { transform: none; } .principles { grid-template-columns: 1fr; margin-top: 48px; } .controls { flex-direction: column; } button { width: 100%; } }
+      @media (max-width: 760px) { nav { margin-bottom: 48px; } .hero { grid-template-columns: 1fr; } .receipt { transform: none; } .principles { grid-template-columns: 1fr; margin-top: 48px; } .demo-head { align-items: stretch; flex-direction: column; } .proof-strip { grid-template-columns: 1fr 1fr; } .controls { flex-direction: column; } button { width: 100%; } }
     </style>
   </head>
   <body>
@@ -138,6 +156,14 @@ const explorerPage = `<!doctype html>
         <div class="principle"><b>Mechanically correct</b><span>Published rules—not model opinion—decide settlement.</span></div>
         <div class="principle"><b>Replay anywhere</b><span>Mirror Node and content hashes reproduce every verdict.</span></div>
       </div>
+      <div class="demo reveal delay-2">
+        <div class="demo-head">
+          <div><p class="eyebrow">Live judge interaction</p><h2>Buy a verified answer now.</h2><p>This triggers a fresh x402 payment. The server delivers an actual FX response, Verity checks it deterministically, Blocky402 settles it on Hedera, and HCS records the receipt.</p></div>
+          <button id="run-demo">Run live purchase</button>
+        </div>
+        <div class="proof-strip"><div>1 · Challenge<strong>HTTP 402</strong></div><div>2 · Delivery<strong>Real provider</strong></div><div>3 · Decision<strong>Published rule</strong></div><div>4 · Evidence<strong>HashScan + HCS</strong></div></div>
+        <pre class="demo-result" id="demo-result" aria-live="polite"></pre>
+      </div>
       <div class="grid reveal delay-2">
         <section>
           <h2>Provider reliability</h2>
@@ -157,6 +183,23 @@ const explorerPage = `<!doctype html>
       <div class="status">Source: <code>GraphReputationClient</code> · <a href="/health" style="color:#8ee6c1">health</a></div>
     </main>
     <script>
+      const demoButton = document.getElementById('run-demo');
+      demoButton.addEventListener('click', async () => {
+        const output = document.getElementById('demo-result');
+        output.classList.add('visible');
+        output.textContent = 'Requesting paid data → checking answer → settling on Hedera…';
+        demoButton.disabled = true;
+        try {
+          const response = await fetch('/demo/honest', { method: 'POST' });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error || 'live purchase failed');
+          output.textContent = JSON.stringify(body, null, 2);
+        } catch (error) {
+          output.textContent = error instanceof Error ? error.message : String(error);
+        } finally {
+          demoButton.disabled = false;
+        }
+      });
       for (const button of document.querySelectorAll('button[data-kind]')) {
         button.addEventListener('click', async () => {
           const kind = button.dataset.kind;
