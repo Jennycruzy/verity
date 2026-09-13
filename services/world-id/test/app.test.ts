@@ -75,6 +75,8 @@ test("serves an operator proof page without exposing the signing key", async () 
   assert.match(result.body(), /Scan or open the request/);
   assert.match(result.body(), /VERITY_WORLD_CONNECTOR_MISSING/);
   assert.match(result.body(), /const environment = "staging"/);
+  assert.match(result.body(), /https:\/\/simulator\.worldcoin\.org\/\?connect_url=/);
+  assert.match(result.body(), /encodeURIComponent\(connectorURI\)/);
   assert.doesNotMatch(result.body(), /1111111111111111111111111111111111111111111111111111111111111111/);
 });
 

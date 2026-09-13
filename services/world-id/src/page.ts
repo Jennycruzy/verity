@@ -153,19 +153,24 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode, environment:
           }
           const connectorURI = typeof request.connectorURI === 'string' ? request.connectorURI.trim() : '';
           if (!connectorURI) throw new Error('VERITY_WORLD_CONNECTOR_MISSING: IDKit did not return a request URL; reload and try again.');
+          const approvalURI = environment === 'staging'
+            ? 'https://simulator.worldcoin.org/?connect_url=' + encodeURIComponent(connectorURI)
+            : connectorURI;
           requestPanel.hidden = false;
-          connector.href = connectorURI;
+          connector.href = approvalURI;
           connector.textContent = environment === 'staging'
             ? 'Open the staging World ID simulator request'
             : 'Open the World ID request in World App';
           connector.hidden = false;
-          connectorValue.textContent = connectorURI;
+          connectorValue.textContent = approvalURI;
           connectorValue.className = 'connector-value';
           if (window.QRCode && qr) {
             qr.textContent = '';
             try {
-              new window.QRCode(qr, { text: connectorURI, width: 280, height: 280, correctLevel: window.QRCode.CorrectLevel.M });
-              qrStatus.textContent = 'Scan this QR code with World App, or use the request link below.';
+              new window.QRCode(qr, { text: approvalURI, width: 280, height: 280, correctLevel: window.QRCode.CorrectLevel.M });
+              qrStatus.textContent = environment === 'staging'
+                ? 'Open this QR or the link below in the browser simulator.'
+                : 'Scan this QR code with World App, or use the request link below.';
               qr.hidden = false;
             } catch (error) {
               qrStatus.textContent = 'The QR renderer failed; use the request link below or open the staging simulator.';

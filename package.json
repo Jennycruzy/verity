@@ -33,6 +33,7 @@
     "graph:build": "npm run graph:prepare && npm --prefix graph/subgraph run build",
     "graph:deploy": "npm run graph:build && tsx scripts/deploy-graph.ts",
     "graph:gateway": "npm --workspace @verity/graph-gateway start",
+    "public:start": "tsx scripts/public-ingress.ts",
     "stake:provider": "tsx scripts/stake-provider.ts",
     "content:start": "npm --workspace @verity/content-service start",
     "disputes:start": "npm --workspace @verity/disputes start",
