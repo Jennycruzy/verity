@@ -1,15 +1,66 @@
 # Verity
 
-Verity is a pay-per-correct-answer settlement layer for objectively verifiable x402 services on Hedera.
+**Pay only for answers that were right.**
 
-The buyer receives the provider response before settlement. A deterministic evaluator then either settles the payment or submits a bonded dispute. Disputes require a verified human root, are checked by an odd set of HTTP checkers, resolve through the escrow contract, and are recorded as compact HCS receipts. The replay command recomputes the recorded rule from Mirror Node and content storage.
+Verity is a settlement layer for x402 APIs on Hedera. The buyer gets the response first, a deterministic rule grades it, and only a correct answer gets paid. A wrong answer becomes a bonded dispute, adjudicated by an odd set of independent checkers, recorded on HCS, and replayable by anyone from Mirror Node alone. No trust in the provider, no trust in Verity.
 
-The supported reference services are:
+## Click these first
 
-- FX rate lookup: a fixed lookup price and numeric tolerance rule.
-- Entity resolution: cached and fresh prices based on observed request usage, with canonical-form equality.
+| What | Link | What you will see |
+| --- | --- | --- |
+| Live product | **[verity.54-154-121-30.sslip.io](https://verity.54-154-121-30.sslip.io)** | Explorer with provider reliability, buyer honesty, and a **Run live purchase** button that pays a real testnet request from your browser and links its receipts |
+| An x402 challenge | [`/provider/fx`](https://verity.54-154-121-30.sslip.io/provider/fx) | The raw HTTP 402 from the honest FX provider: scheme `exact`, network `hedera:testnet`, price, fee payer |
+| Settlement receipts | [HCS topic 0.0.10501385](https://hashscan.io/testnet/topic/0.0.10501385) | Every settled request as a compact `settlement` record, plus the staked `provider` record |
+| Dispute receipts | [HCS topic 0.0.10501386](https://hashscan.io/testnet/topic/0.0.10501386) | Where bonded disputes land as `dispute`, `verdict`, and `bond` messages |
+| Bond escrow | [Contract 0.0.10502300](https://hashscan.io/testnet/contract/0.0.10502300) | Holds buyer bonds and provider stake; source in [`contracts/src/VerityBondEscrow.sol`](contracts/src/VerityBondEscrow.sol) |
+| Provider stake | [Stake transaction](https://hashscan.io/testnet/transaction/0.0.10501091@1789306145.776916903) · [HCS record](https://hashscan.io/testnet/transaction/0.0.10501091@1789306148.696381853) | The FX provider has real HBAR at risk before it can be paid |
+| One paid request, end to end | [Payment](https://hashscan.io/testnet/transaction/0.0.7162784@1789307385.390679735) → [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789307389.005164094) | Request `f5a5eef8`, made from the website button: Blocky402 transfer, then the receipt four seconds later |
+| Reputation index | [Subgraph playground](https://api.studio.thegraph.com/query/1760236/verity/0.1.2/graphql) · [Provider identity on Base Sepolia](https://sepolia.basescan.org/tx/0xca1fcd45e24a3f68348d93e23323f27f69e80b3bbd9c9756caae1269d21c58b7) | ERC-8004 agents `9221` (provider) and `9222` (buyer) indexed by The Graph. Paste `{ agent(id:"84532:9221") { registrationFile { webEndpoint } } }` and it returns the live provider URL |
+| Upstream contribution | [hedera-dev/hedera-harness#80](https://github.com/hedera-dev/hedera-harness/pull/80) | Capability discovery for x402 facilitators, open for review |
+| Independent checker | [`services/checker-go/main.go`](services/checker-go/main.go) · [`/checker/health`](https://verity.54-154-121-30.sslip.io/checker/health) | A second implementation of the rule in Go, so a TypeScript bug cannot rig a verdict |
+| Replay tool | [`packages/replay/`](packages/replay/) | `npx verity replay <disputeId>` recomputes a verdict from Mirror Node and content hashes with no Verity service in the loop |
 
-Subjective prose quality is outside the product scope.
+Every transaction above resolved as `SUCCESS` on Mirror Node on 2026-09-13. The settlement topic holds 23 settled requests and 2 provider records at the time of writing.
+
+## Why this exists
+
+Agents are about to buy data from other agents over x402, and today the buyer pays before it can tell whether the answer was any good. For a whole class of services that is unnecessary. An FX rate, an entity resolution, a unit conversion: each has a rule a machine can check. Verity makes that rule the payment condition.
+
+- **Deliver first, settle second.** The x402 signed transfer is held while the buyer evaluates. Hedera's finality makes the hold short enough to fit inside a live HTTP request; the measured ceiling is 91 seconds ([run record](docs/HOLD-WINDOW.md)).
+- **Rejection costs the buyer something.** A dispute needs a World ID human root and an HBAR bond in escrow. Lying about a good answer is not free.
+- **Providers have skin in the game.** A provider stakes before it can be paid, and a wrong answer upheld by the checkers is paid out of that stake.
+- **Nobody has to trust the referee.** Every verdict is a compact HCS message that names the rule, the content hashes, and the votes. `verity replay` fetches those bytes, re-runs the rule, and exits non-zero if the recorded result does not match.
+- **Reputation is two-sided.** Providers earn a reliability score, buyers earn an honesty score, and both are indexed by The Graph under ERC-8004 identities so any agent can pick a counterparty before spending.
+
+## How a paid request flows
+
+1. The buyer calls `/fx`, gets a 402 challenge, signs an x402 transfer, and calls again.
+2. The provider answers immediately. The buyer has the data before any HBAR moves.
+3. The buyer's evaluator applies the published rule (`fx-rate-v1`: numeric tolerance; entity resolution: canonical-form equality).
+4. **Accept:** the settlement coordinator releases the transfer through the facilitator and writes a `settlement` receipt to HCS.
+5. **Reject:** the buyer posts a bond, attaches its World ID proof, and submits the response plus paid answers from reference providers. An odd set of checkers votes; a strict majority decides, the escrow pays the winner, and three HCS messages record it.
+6. Anyone runs `npx verity replay <disputeId>` and gets the same answer from public data.
+
+## Add it to an API you already run
+
+```ts
+import { protect } from "@verity/sdk";
+const protectedApp = protect(app, { price: "100", verifier: "fx-rate-v1" });
+```
+
+One wrapper. Your handler keeps its response body and your own Hedera account; Verity owns the 402 challenge, facilitator verification, and the receipt. The complete server and buyer example is in [SDK quickstart](#sdk-quickstart).
+
+## What is not done
+
+- No live dispute has been recorded yet, so the dispute topic is empty and `verity replay` has only run against test records. The rejection path is wired end to end (`npm run dispute:demo`) and waits on a production World ID proof.
+- The recorded World ID proof is from the staging simulator. It proves the integration, not human uniqueness.
+- Reputation scores are computed from Agent0 feedback events, and no adjudication has written one yet, so the explorer shows the registered identities and endpoints with scores at their no-feedback baseline.
+- The `@jennycruzy/verity` npm package is prepared but not published; install from this repository for now.
+- No third-party provider has integrated. [ADOPTION.md](ADOPTION.md) stays empty until one does with its own process and endpoint.
+
+Everything below is the operator guide: how to run, configure, deploy, and reproduce every record linked above.
+
+---
 
 ## Repository map
 
@@ -250,26 +301,8 @@ npm run demo
 
 The buyer calls the provider, receives the response, evaluates it locally, and settles an accepted response through the settlement coordinator. A successful run prints the facilitator transaction ID and HCS transaction ID. Those IDs can be opened using the configured HashScan testnet base URL.
 
-Live honest-path evidence from 2026-09-12:
 
-- The public explorer's **Run live purchase** button created request `f5a5eef8-7ff7-4014-a100-52bbea0f0c9e`, returned `RATE_WITHIN_TOLERANCE`, settled through [Blocky402](https://hashscan.io/testnet/transaction/0.0.7162784@1789307385.390679735), and anchored its [HCS receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789307389.005164094) on 2026-09-13. This browser workflow uses a bounded server-side agent signer; no key is sent to the browser.
-- Public Lightsail request `cdea3463-db37-411d-ae4b-543e37e41b64` evaluated `RATE_WITHIN_TOLERANCE` against `https://verity.54-154-121-30.sslip.io/provider/fx` on 2026-09-13.
-- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789304983.267202853) and [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789304986.304165422) prove the publicly hosted path end to end.
-
-- Request `9cd9993d-c4f5-4445-a14e-6cb23ef74d5a` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08` on 2026-09-13.
-- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789283686.210609392) and [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789283687.523085878) are independently resolvable.
-
-- Request `0721bd9e-332c-416f-8cde-4d091164e8a6` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08` after the deployment hardening changes.
-- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789252458.310034075) transferred the configured amount to the provider treasury.
-- [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789252461.678940522) is readable from settlement topic `0.0.10501385`.
-
-- Request `a7353260-8829-445e-ad23-d6f23baa3bae` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08`.
-- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789245767.729586729) transferred the configured amount to the provider treasury.
-- [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789245772.571672131) is readable from settlement topic `0.0.10501385`.
-
-- Request `1302814f-dcff-4653-8a64-4964cb0e975c` evaluated `RATE_WITHIN_TOLERANCE` for EUR/USD at `1.08`.
-- [Blocky402 settlement](https://hashscan.io/testnet/transaction/0.0.7162784@1789225308.975547656) transferred `0.01 HBAR` to the configured provider treasury.
-- [HCS settlement receipt](https://hashscan.io/testnet/transaction/0.0.10472838@1789225312.834478783) is readable from settlement topic `0.0.10501385`.
+Every recorded settlement, including the two created through the public host and the website button, is listed with its payment and receipt links in [Public records](#public-records). The website button uses a bounded server-side agent signer; no key is sent to the browser.
 
 For a rejected response, the buyer additionally needs a World ID proof, `VERITY_DISPUTE_URL`, a positive bond, one content reference per configured checker response, the escrow contract settings, and a running dispute service. The rejection path posts the bond before it sends the dispute request. There is no local identity substitute in the live path.
 
