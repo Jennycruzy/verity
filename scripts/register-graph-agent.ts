@@ -101,7 +101,8 @@ function createAgentUri(role: "provider" | "buyer", endpoint: string | undefined
     registrations: [{ agentRegistry: registry, agentId }],
     supportedTrust: ["reputation", "crypto-economic"]
   });
-  return `data:application/json;base64,${Buffer.from(JSON.stringify(registration), "utf8").toString("base64")}`;
+  const encoded = Buffer.from(JSON.stringify(registration), "utf8").toString("base64");
+  return `data:application/json;base64,${encoded}${endpoint ? `#verity-web-endpoint=${endpoint}` : ""}`;
 }
 
 async function updateEnv(values: Readonly<Record<string, string>>): Promise<void> {

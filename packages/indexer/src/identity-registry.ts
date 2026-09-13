@@ -85,7 +85,8 @@ export function createErc8004AgentDataUri(input: Erc8004RegistrationFileInput): 
     registrations: [{ agentRegistry: input.registry, agentId: input.agentId }],
     supportedTrust: ["reputation", "crypto-economic"]
   });
-  return `data:application/json;base64,${Buffer.from(JSON.stringify(registration), "utf8").toString("base64")}`;
+  const encoded = Buffer.from(JSON.stringify(registration), "utf8").toString("base64");
+  return `data:application/json;base64,${encoded}#verity-web-endpoint=${appendPath(input.publicUrl, input.kind === "fx" ? "fx" : "entity")}`;
 }
 
 export function parseErc8004AgentDataUri(uri: string): Erc8004Registration {

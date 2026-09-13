@@ -92,6 +92,8 @@ function saveRegistration(agent: Agent, uri: string, timestamp: BigInt, transact
   const registration = new AgentRegistrationFile(registrationId)
   registration.agent = agent.id
   registration.rawURI = uri
+  const endpoint = extractWebEndpoint(uri)
+  if (endpoint !== null) registration.webEndpoint = endpoint
   registration.createdAt = timestamp
   registration.save()
   agent.registrationFile = registrationId
@@ -118,5 +120,14 @@ function extractHumanRoot(uri: string): string | null {
     const code = value.charCodeAt(i)
     if (code < 48 || code > 57) return null
   }
+  return value
+}
+
+function extractWebEndpoint(uri: string): string | null {
+  const marker = "#verity-web-endpoint="
+  const start = uri.indexOf(marker)
+  if (start < 0) return null
+  const value = uri.substring(start + marker.length)
+  if (value.indexOf("http://") !== 0 && value.indexOf("https://") !== 0) return null
   return value
 }
