@@ -69,7 +69,7 @@ test("serves an operator proof page without exposing the signing key", async () 
   assert.equal(result.status(), 200);
   assert.match(result.body(), /IDKit\.proofOfHuman/);
   assert.match(result.body(), /@worldcoin\/idkit-core@4\.2\.4\/dist\/idkit\.global\.js/);
-  assert.match(result.body(), /qrcode@1\.5\.4\/build\/qrcode\.min\.js/);
+  assert.match(result.body(), /qrcodejs@1\.0\.0\/qrcode\.min\.js/);
   assert.match(result.body(), /World ID request QR code/);
   assert.doesNotMatch(result.body(), /1111111111111111111111111111111111111111111111111111111111111111/);
 });
