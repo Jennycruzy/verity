@@ -5,6 +5,8 @@ import { readWorldIdServiceConfig } from "./config.js";
 
 loadDotenv({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 const config = readWorldIdServiceConfig();
-createWorldIdServer(config).listen(config.port, () => {
-  process.stdout.write(`Verity World ID service listening on ${config.port}\n`);
+const host = process.env.WORLD_ID_HOST?.trim() || "0.0.0.0";
+
+createWorldIdServer(config).listen(config.port, host, () => {
+  process.stdout.write(`Verity World ID service listening on http://${host}:${config.port}\n`);
 });
