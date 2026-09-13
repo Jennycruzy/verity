@@ -63,7 +63,11 @@ function redact(value: string, secret: string): string {
 function readQueryEndpoint(output: string): string {
   const match = /Queries \(HTTP\):\s+(https?:\/\/\S+)/.exec(output);
   if (!match?.[1]) throw new Error("VERITY_GRAPH_DEPLOY_ENDPOINT_MISSING: Graph CLI did not return a Studio query endpoint");
-  return match[1].trim();
+  return stripAnsi(match[1]).trim();
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d/#&.:=?%@~_]+)*)?\u0007)|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g, "");
 }
 
 async function updateEnvQueryEndpoint(endpoint: string): Promise<void> {
