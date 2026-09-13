@@ -121,6 +121,13 @@ const explorerPage = `<!doctype html>
       .principle { padding: 18px; border-left: 1px solid var(--line); }
       .principle b { display: block; margin-bottom: 6px; font-family: 'Space Grotesk', sans-serif; font-size: 1rem; }
       .principle span { color: #829a91; font-size: .78rem; line-height: 1.5; }
+      .sdk-proof { display: grid; grid-template-columns: .82fr 1.18fr; gap: 24px; align-items: stretch; margin-top: 36px; padding: 24px; border: 1px solid #315a4c; border-radius: 18px; background: linear-gradient(135deg, #10241fd9, #091411e8); }
+      .sdk-proof h2 { margin: 0 0 8px; font-family: 'Space Grotesk', sans-serif; font-size: clamp(1.5rem, 3vw, 2.2rem); letter-spacing: -.04em; }
+      .sdk-proof p { margin: 0; font-size: .86rem; }
+      .sdk-code { margin: 0; min-height: 0; border: 1px solid #29473e; color: #d8fff0; }
+      .sdk-code .accent { color: #61e8b5; }
+      .sdk-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .sdk-pills span { padding: 7px 9px; border: 1px solid #326b58; border-radius: 999px; color: #a9f4d2; font-size: .68rem; font-weight: 700; }
       section { padding: 24px; border: 1px solid #29473e; border-radius: 18px; background: #0c1916dd; box-shadow: 0 22px 70px #02080788; backdrop-filter: blur(14px); transition: transform .25s ease, border-color .25s ease; }
       section:hover { transform: translateY(-3px); border-color: #477968; }
       section h2 { margin: 0 0 6px; font-size: 1.12rem; }
@@ -141,7 +148,7 @@ const explorerPage = `<!doctype html>
       @keyframes pulse { 0% { box-shadow: 0 0 0 0 #61e8b566; } 70%,100% { box-shadow: 0 0 0 10px #61e8b500; } }
       @keyframes receipt-in { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
       @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
-      @media (max-width: 760px) { nav { margin-bottom: 48px; } .hero { grid-template-columns: 1fr; } .receipt { transform: none; } .principles { grid-template-columns: 1fr; margin-top: 48px; } .demo-head { align-items: stretch; flex-direction: column; } .proof-strip { grid-template-columns: 1fr 1fr; } .controls { flex-direction: column; } button { width: 100%; } }
+      @media (max-width: 760px) { nav { margin-bottom: 48px; } .hero { grid-template-columns: 1fr; } .receipt { transform: none; } .principles { grid-template-columns: 1fr; margin-top: 48px; } .sdk-proof { grid-template-columns: 1fr; } .demo-head { align-items: stretch; flex-direction: column; } .proof-strip { grid-template-columns: 1fr 1fr; } .controls { flex-direction: column; } button { width: 100%; } }
     </style>
   </head>
   <body>
@@ -168,6 +175,20 @@ const explorerPage = `<!doctype html>
         <div class="principle"><b>Mechanically correct</b><span>Published rules—not model opinion—decide settlement.</span></div>
         <div class="principle"><b>Replay anywhere</b><span>Mirror Node and content hashes reproduce every verdict.</span></div>
       </div>
+      <section class="sdk-proof reveal delay-2" aria-label="Verity SDK quickstart">
+        <div>
+          <p class="eyebrow">Two-line integration</p>
+          <h2>Keep your API. Add a verdict.</h2>
+          <p>One wrapper protects an existing x402 handler. The provider chooses a published rule; Verity handles the challenge, delivery-first flow, and evidence.</p>
+          <div class="sdk-pills"><span>NO RESTRUCTURING</span><span>DETERMINISTIC</span><span>HEDERA TESTNET</span></div>
+        </div>
+        <pre class="sdk-code"><span class="accent">import</span> { protect } <span class="accent">from</span> '@jennycruzy/verity';
+
+<span class="accent">const</span> handler = protect(app, {
+  price: '1000000',
+  verifier: 'fx-rate-v1'
+});</pre>
+      </section>
       <div class="demo reveal delay-2">
         <div class="demo-head">
           <div><p class="eyebrow">Live judge interaction</p><h2>Buy a verified answer now.</h2><p>This triggers a fresh x402 payment. The server delivers an actual FX response, Verity checks it deterministically, Blocky402 settles it on Hedera, and HCS records the receipt.</p></div>
