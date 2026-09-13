@@ -8,6 +8,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Verity identity proof</title>
     <script src="https://cdn.jsdelivr.net/npm/@worldcoin/idkit-core@4.2.4/dist/idkit.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
     <style>
       :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #08131a; color: #e8f0ff; }
       body { margin: 0; padding: 32px; }
@@ -41,6 +42,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       <button id="start">Open World ID</button>
       <p id="status" class="note" aria-live="polite"></p>
       <p><a id="connector" hidden target="_blank" rel="noreferrer">Open the World ID request</a></p>
+      <canvas id="qr" hidden width="280" height="280" aria-label="World ID request QR code"></canvas>
       <label for="proof">Complete IDKit proof JSON</label>
       <textarea id="proof" readonly></textarea>
       <label for="verification">Developer Portal verification response</label>
@@ -58,6 +60,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
       const startButton = document.getElementById('start');
       const statusOutput = document.getElementById('status');
       const connector = document.getElementById('connector');
+      const qr = document.getElementById('qr');
       const proofOutput = document.getElementById('proof');
       const verificationOutput = document.getElementById('verification');
 
@@ -81,6 +84,7 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
         }
         startButton.disabled = true;
         connector.hidden = true;
+        qr.hidden = true;
         proofOutput.value = '';
         verificationOutput.textContent = '';
         statusOutput.className = 'note';
@@ -125,7 +129,11 @@ export function renderWorldIdProofPage(proofMode: WorldIdProofMode): string {
           }
           connector.href = request.connectorURI;
           connector.textContent = 'Open the World ID request in World App';
-          connector.hidden = false;
+          connector.hidden = !request.connectorURI;
+          if (request.connectorURI && window.QRCode && qr) {
+            await window.QRCode.toCanvas(qr, request.connectorURI, { width: 280, margin: 2 });
+            qr.hidden = false;
+          }
           statusOutput.textContent = 'Approve the request in World App or the simulator; this page is polling for completion.';
           const completion = await request.pollUntilCompletion({ pollInterval: 2000, timeout: 120000 });
           if (!completion.success) throw new Error(completion.error || 'World ID did not complete the request.');
