@@ -66,6 +66,7 @@ WORLD_ID_ENVIRONMENT=production
 VERITY_BUYER_REPUTATION_ENDPOINT=<hosted-studio-query-url>
 VERITY_BUYER_REPUTATION_API_KEY=<hosted-graph-api-key>
 VERITY_BUYER_REPUTATION_QUERY_FILE=docs/graph/agent0-buyer.query.json
+VERITY_BUYER_REPUTATION_ROOT_STORE_PATH=/data/provider/buyer-roots.json
 VERITY_BUYER_REPUTATION_MIN_HONESTY=0.8
 ```
 

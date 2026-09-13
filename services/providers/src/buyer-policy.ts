@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { MemoryRootStore, WorldIdVerifier, type WorldIdProof } from "@verity/agent";
+import { FileRootStore, WorldIdVerifier, type WorldIdProof } from "@verity/agent";
 import { GraphReputationClient, type ReputationClient, type ReputationQuery } from "@verity/indexer";
 import type { ProtectedRequest } from "@verity/sdk";
 import { VERITY_HUMAN_ROOT_HEADER, VERITY_WORLD_PROOF_HEADER, VERITY_WORLD_SIGNAL_HEADER } from "@verity/types";
@@ -77,7 +77,7 @@ export async function createBuyerReputationPolicy(
   );
   const identity = new WorldIdVerifier(
     { verifyUrl: config.verifyUrl, action: config.action, proofMode: config.proofMode },
-    new MemoryRootStore(),
+    new FileRootStore(config.rootStorePath),
     fetchImpl
   );
   return new BuyerReputationPolicy(identity, reputation, config.minimumHonesty);

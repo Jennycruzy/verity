@@ -7,6 +7,7 @@ export interface BuyerReputationPolicyConfig {
   readonly endpoint: string;
   readonly apiKey: string;
   readonly queryFile: string;
+  readonly rootStorePath: string;
   readonly minimumHonesty: number;
   readonly verifyUrl: string;
   readonly action: string;
@@ -88,14 +89,15 @@ export function readProviderServiceConfig(env: NodeJS.ProcessEnv = process.env):
     env.VERITY_BUYER_REPUTATION_ENDPOINT?.trim(),
     env.VERITY_BUYER_REPUTATION_API_KEY?.trim(),
     env.VERITY_BUYER_REPUTATION_QUERY_FILE?.trim(),
+    env.VERITY_BUYER_REPUTATION_ROOT_STORE_PATH?.trim(),
     env.VERITY_BUYER_REPUTATION_MIN_HONESTY?.trim(),
     env.WORLD_ID_VERIFY_URL?.trim(),
     env.WORLD_ID_DISPUTE_ACTION?.trim()
   ].filter(Boolean).length;
-  if (buyerReputationFields !== 0 && buyerReputationFields !== 6) {
-    throw new Error("VERITY_PROVIDER_CONFIG_INVALID: buyer reputation admission requires endpoint, API key, query file, honesty threshold, World verify URL, and World action");
+  if (buyerReputationFields !== 0 && buyerReputationFields !== 7) {
+    throw new Error("VERITY_PROVIDER_CONFIG_INVALID: buyer reputation admission requires endpoint, API key, query file, root store path, honesty threshold, World verify URL, and World action");
   }
-  const buyerReputation = buyerReputationFields === 6 ? readBuyerReputationConfig(env) : undefined;
+  const buyerReputation = buyerReputationFields === 7 ? readBuyerReputationConfig(env) : undefined;
 
   return {
     ...readProviderConfig(env),
@@ -118,13 +120,14 @@ function readBuyerReputationConfig(env: NodeJS.ProcessEnv): BuyerReputationPolic
   const endpoint = requiredHttpUrl(env, "VERITY_BUYER_REPUTATION_ENDPOINT");
   const apiKey = required(env, "VERITY_BUYER_REPUTATION_API_KEY");
   const queryFile = required(env, "VERITY_BUYER_REPUTATION_QUERY_FILE");
+  const rootStorePath = required(env, "VERITY_BUYER_REPUTATION_ROOT_STORE_PATH");
   const minimumHonesty = Number(required(env, "VERITY_BUYER_REPUTATION_MIN_HONESTY"));
   if (!Number.isFinite(minimumHonesty) || minimumHonesty < 0 || minimumHonesty > 1) {
     throw new Error("VERITY_PROVIDER_CONFIG_INVALID: VERITY_BUYER_REPUTATION_MIN_HONESTY must be between 0 and 1");
   }
   const verifyUrl = requiredHttpUrl(env, "WORLD_ID_VERIFY_URL");
   const action = required(env, "WORLD_ID_DISPUTE_ACTION");
-  return { endpoint, apiKey, queryFile, minimumHonesty, verifyUrl, action, proofMode: normalizeWorldProofMode(env.WORLD_ID_PROOF_MODE) };
+  return { endpoint, apiKey, queryFile, rootStorePath, minimumHonesty, verifyUrl, action, proofMode: normalizeWorldProofMode(env.WORLD_ID_PROOF_MODE) };
 }
 
 function requiredHttpUrl(env: NodeJS.ProcessEnv, name: string): string {
