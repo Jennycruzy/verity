@@ -63,6 +63,17 @@ const result = await buy("http://127.0.0.1:3000/fx", {
 console.log(result.verdict, result.settlement?.transaction);
 ```
 
+Publish the SDK from the repository root after the checks pass. The package is public, bundles the Verity runtime and replay command, and does not depend on private workspace packages after installation:
+
+```sh
+npm login --auth-type=web
+npm whoami
+npm publish --workspace @jennycruzy/verity --access public
+npm view @jennycruzy/verity version
+```
+
+If npm requests a browser or one-time-password confirmation, complete it in the npm account that owns the `@jennycruzy` scope. The publish command runs the package build through `prepack`; do not publish a tarball made from an unbuilt checkout.
+
 Run the example from the repository after `npm install`, with the provider variables from `.env.example` set. A rejected response additionally needs a bond, verified World ID proof, content store, checker responses, and dispute service configuration; the buyer never settles a rejected response directly.
 
 ## Local checks
@@ -118,7 +129,7 @@ Set the `HEDERA_TOKEN_*` fields first. The command writes the created token ID t
 
 Live reviewer deployment: [verity.54-154-121-30.sslip.io](https://verity.54-154-121-30.sslip.io). The root serves the Graph-backed explorer; `/provider/fx` is the honest x402 resource; `/bad-provider/fx` is the config-degraded resource; `/content`, `/disputes`, and `/reputation` expose the replay, adjudication, and paid Graph dependencies. All processes run separately under the isolated `verity-stack.service`; nginx terminates TLS.
 
-For a public deployment, point the base domain and the service subdomains in `deploy/Caddyfile` at a server, set `VERITY_DOMAIN`, and run `docker compose up -d --build`. Caddy obtains TLS certificates automatically. The compose file runs honest FX, degradable FX, secondary FX, and entity-resolution providers separately, includes the independent Go checker, persists content and dispute records in named volumes, and does not copy `.env` into an image. A small server is operational hosting, not a blockchain funding requirement. See [docs/PUBLIC-DEPLOY.md](docs/PUBLIC-DEPLOY.md) for the secure copy-paste runbook.
+For a public deployment, point the base domain and the service subdomains in `deploy/Caddyfile` at a server, set `VERITY_DOMAIN`, and run `docker compose up -d --build`. Caddy obtains TLS certificates automatically. A single-host ingress may instead set `VERITY_PUBLIC_BASE_URL` and use the path routes shown in the live deployment; `npm run public:check` supports both layouts. The compose file runs honest FX, degradable FX, secondary FX, and entity-resolution providers separately, includes the independent Go checker, persists content and dispute records in named volumes, and does not copy `.env` into an image. A small server is operational hosting, not a blockchain funding requirement. See [docs/PUBLIC-DEPLOY.md](docs/PUBLIC-DEPLOY.md) for the secure copy-paste runbook.
 
 For a short-lived review session, `npm run public:start` starts one ingress on port `8080`. It exposes `/provider`, `/content`, `/disputes`, and `/reputation` to their separate local processes and serves the explorer at `/`. Put that single port behind an HTTPS tunnel, then set the corresponding public environment URLs. This is useful for live verification but has no uptime claim; the Caddy deployment remains the durable path.
 

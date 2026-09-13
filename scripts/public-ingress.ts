@@ -10,7 +10,8 @@ const routes = [
   { prefix: "/checker", target: "http://127.0.0.1:3201" },
   { prefix: "/content", target: "http://127.0.0.1:8090" },
   { prefix: "/disputes", target: "http://127.0.0.1:8091" },
-  { prefix: "/reputation", target: "http://127.0.0.1:8092" }
+  { prefix: "/reputation", target: "http://127.0.0.1:8092" },
+  { prefix: "/identity", target: "http://127.0.0.1:8093" }
 ] as const;
 
 const host = process.env.PUBLIC_INGRESS_HOST?.trim() || "0.0.0.0";
