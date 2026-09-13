@@ -19,6 +19,19 @@ test("verifies a successful postBond contract result from Mirror Node", async ()
   await verifier.verify({ transactionId: "0.0.9@1.000000000", disputeId: "dispute-1", providerRoot, buyerAddress, amountTinybars: "10" });
 });
 
+test("retries a bond lookup while Mirror Node is still propagating it", async () => {
+  const abi = new Interface(["function postBond(bytes32 disputeId, bytes32 providerRoot) payable"]);
+  const parameters = abi.encodeFunctionData("postBond", [bytes32("dispute-1"), bytes32(providerRoot)]);
+  let attempts = 0;
+  const verifier = new MirrorBondVerifier("https://mirror.invalid/api/v1", contractId, async () => {
+    attempts += 1;
+    if (attempts === 1) return new Response("not ready", { status: 404 });
+    return new Response(JSON.stringify({ contract_id: contractId, from: buyerAddress, amount: "10", function_parameters: parameters, result: "SUCCESS" }), { status: 200 });
+  });
+  await verifier.verify({ transactionId: "0.0.9@1.000000000", disputeId: "dispute-1", providerRoot, buyerAddress, amountTinybars: "10" });
+  assert.equal(attempts, 2);
+});
+
 test("verifies a successful postBondWithExpiry contract result from Mirror Node", async () => {
   const abi = new Interface(["function postBondWithExpiry(bytes32 disputeId, bytes32 providerRoot, uint256 expiresAt) payable"]);
   const parameters = abi.encodeFunctionData("postBondWithExpiry", [bytes32("dispute-1"), bytes32(providerRoot), 1_800_000_000n]);

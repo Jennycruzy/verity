@@ -201,9 +201,9 @@ test("records a complete upheld dispute without settling the held payment", asyn
   assert.equal(result.state, "void");
   assert.equal(result.transactionId, undefined);
   assert.equal(published.length, 3);
-  assert.deepEqual((published[0] as { payload: { evaluationInput: unknown; resolution: string } }).payload.evaluationInput, { sha256: "input-hash" });
-  assert.equal((published[0] as { payload: { bondTransactionId: string } }).payload.bondTransactionId, "0.0.9@1.000000000");
-  assert.equal((published[0] as { payload: { resolution: string } }).payload.resolution, "void");
+  assert.equal((published[0] as { payload: { input: string; verdict: string } }).payload.input, "input-hash");
+  assert.equal((published[0] as { payload: { verdict: string } }).payload.verdict, "reject");
+  assert.equal((published[2] as { payload: { bondResolutionTransactionId: string } }).payload.bondResolutionTransactionId, "0.0.10@2.000000000");
 });
 
 test("settles and records an overturned dispute", async () => {

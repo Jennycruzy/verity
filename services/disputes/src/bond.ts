@@ -38,6 +38,8 @@ const STAKE_PROVIDER_INTERFACE = new Interface(["function stakeProvider(bytes32 
 const POST_BOND_SELECTOR = POST_BOND_INTERFACE.getFunction("postBond")?.selector;
 const POST_BOND_WITH_EXPIRY_SELECTOR = POST_BOND_WITH_EXPIRY_INTERFACE.getFunction("postBondWithExpiry")?.selector;
 const STAKE_PROVIDER_SELECTOR = STAKE_PROVIDER_INTERFACE.getFunction("stakeProvider")?.selector;
+const MIRROR_RETRY_ATTEMPTS = 5;
+const MIRROR_RETRY_DELAY_MS = 500;
 
 export class MirrorBondVerifier implements BondVerifier {
   private readonly baseUrl: string;
@@ -58,17 +60,12 @@ export class MirrorBondVerifier implements BondVerifier {
 
   public async verify(input: BondVerificationInput): Promise<void> {
     const transactionId = toMirrorTransactionId(input.transactionId);
-    const response = await this.fetchImpl(`${this.baseUrl}/contracts/results/${encodeURIComponent(transactionId)}`);
-    const raw = await response.text();
-    let value: unknown;
-    try {
-      value = JSON.parse(raw);
-    } catch (error) {
-      throw new Error("VERITY_BOND_MIRROR_JSON: Mirror Node returned invalid JSON", { cause: error });
-    }
-    if (!response.ok || !isContractResult(value)) {
-      throw new Error(`VERITY_BOND_NOT_VERIFIED: Mirror Node did not return a successful contract result for ${input.transactionId}`);
-    }
+    const value = await readContractResult(
+      `${this.baseUrl}/contracts/results/${encodeURIComponent(transactionId)}`,
+      input.transactionId,
+      this.fetchImpl,
+      "VERITY_BOND"
+    );
     if (value.result !== "SUCCESS") throw new Error(`VERITY_BOND_NOT_VERIFIED: transaction ${input.transactionId} did not succeed`);
     if (value.contract_id !== this.escrowContractId) throw new Error("VERITY_BOND_CONTRACT_MISMATCH: bond transaction targeted another contract");
     if (!await mirrorCallerMatches(this.baseUrl, String(value.from), input.buyerAddress, this.fetchImpl)) throw new Error("VERITY_BOND_CALLER_MISMATCH: bond was not posted by the buyer address");
@@ -114,17 +111,12 @@ export class MirrorStakeVerifier implements StakeVerifier {
 
   public async verify(input: StakeVerificationInput): Promise<void> {
     const transactionId = toMirrorTransactionId(input.transactionId);
-    const response = await this.fetchImpl(`${this.baseUrl}/contracts/results/${encodeURIComponent(transactionId)}`);
-    const raw = await response.text();
-    let value: unknown;
-    try {
-      value = JSON.parse(raw);
-    } catch (error) {
-      throw new Error("VERITY_STAKE_MIRROR_JSON: Mirror Node returned invalid JSON", { cause: error });
-    }
-    if (!response.ok || !isContractResult(value)) {
-      throw new Error(`VERITY_STAKE_NOT_VERIFIED: Mirror Node did not return a successful contract result for ${input.transactionId}`);
-    }
+    const value = await readContractResult(
+      `${this.baseUrl}/contracts/results/${encodeURIComponent(transactionId)}`,
+      input.transactionId,
+      this.fetchImpl,
+      "VERITY_STAKE"
+    );
     if (value.result !== "SUCCESS") throw new Error(`VERITY_STAKE_NOT_VERIFIED: transaction ${input.transactionId} did not succeed`);
     if (value.contract_id !== this.escrowContractId) throw new Error("VERITY_STAKE_CONTRACT_MISMATCH: stake transaction targeted another contract");
     if (!await mirrorCallerMatches(this.baseUrl, String(value.from), input.providerAddress, this.fetchImpl)) throw new Error("VERITY_STAKE_CALLER_MISMATCH: stake was not posted by the provider address");
@@ -144,6 +136,38 @@ export class MirrorStakeVerifier implements StakeVerifier {
       throw new Error("VERITY_STAKE_ARGUMENT_MISMATCH: stake provider root does not match the registry record");
     }
   }
+}
+
+async function readContractResult(
+  url: string,
+  transactionId: string,
+  fetchImpl: typeof fetch,
+  label: "VERITY_BOND" | "VERITY_STAKE"
+): Promise<ContractResult> {
+  let lastFailure = "Mirror Node did not return a successful contract result";
+  for (let attempt = 1; attempt <= MIRROR_RETRY_ATTEMPTS; attempt += 1) {
+    const response = await fetchImpl(url);
+    const raw = await response.text();
+    let value: unknown;
+    try {
+      value = JSON.parse(raw);
+    } catch (error) {
+      lastFailure = "Mirror Node returned invalid JSON";
+      if (attempt === MIRROR_RETRY_ATTEMPTS) {
+        throw new Error(`${label}_MIRROR_JSON: ${lastFailure}`, { cause: error });
+      }
+      await waitForMirrorRetry(attempt);
+      continue;
+    }
+    if (response.ok && isContractResult(value)) return value;
+    lastFailure = response.ok ? "Mirror Node returned an invalid contract result" : `Mirror Node returned HTTP ${response.status}`;
+    if (attempt < MIRROR_RETRY_ATTEMPTS) await waitForMirrorRetry(attempt);
+  }
+  throw new Error(`${label}_NOT_VERIFIED: ${lastFailure} for ${transactionId}`);
+}
+
+async function waitForMirrorRetry(attempt: number): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, MIRROR_RETRY_DELAY_MS * attempt));
 }
 
 export function toMirrorTransactionId(value: string): string {

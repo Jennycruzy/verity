@@ -120,20 +120,36 @@ function majority(votes: readonly Verdict[], ruleId: RuleId): { verdict: Verdict
 
 function parseDisputeRecord(value: Record<string, unknown>, disputeId: string): DisputeRecord {
   const candidate = value as Partial<DisputeRecord>;
+  const input = normalizeHashReference(value.evaluationInput ?? value.input);
+  const buyerResponse = normalizeHashReference(value.buyerResponse ?? value.buyer);
+  const providerResponses = value.providerResponses ?? value.responses;
+  const crossCheckerVerdicts = value.crossCheckerVerdicts ?? value.votes;
   if ((candidate.disputeId !== undefined && candidate.disputeId !== disputeId)
     || !isRuleId(candidate.ruleId)
     || (candidate.verdict !== "accept" && candidate.verdict !== "reject")
-    || !isHashReference(candidate.evaluationInput)
-    || !isHashReference(candidate.buyerResponse)
-    || !Array.isArray(candidate.providerResponses)
-    || !candidate.providerResponses.every(isHashReference)
-    || !Array.isArray(candidate.crossCheckerVerdicts)
-    || !candidate.crossCheckerVerdicts.every(isCheckerReceipt)
-    || new Set(candidate.crossCheckerVerdicts.map((vote) => vote.checkerId)).size !== candidate.crossCheckerVerdicts.length
-    || candidate.providerResponses.length !== candidate.crossCheckerVerdicts.length) {
+    || !input
+    || !buyerResponse
+    || !Array.isArray(providerResponses)
+    || !providerResponses.every((reference) => Boolean(normalizeHashReference(reference)))
+    || !Array.isArray(crossCheckerVerdicts)
+    || !crossCheckerVerdicts.every(isCheckerReceipt)
+    || new Set(crossCheckerVerdicts.map((vote) => vote.checkerId)).size !== crossCheckerVerdicts.length
+    || providerResponses.length !== crossCheckerVerdicts.length) {
     throw new Error(`VERITY_REPLAY_SCHEMA: dispute ${disputeId} did not contain the replay inputs`);
   }
-  return { ...candidate, disputeId } as DisputeRecord;
+  return {
+    ...candidate,
+    disputeId,
+    evaluationInput: input,
+    buyerResponse,
+    providerResponses: providerResponses.map((reference) => normalizeHashReference(reference) as ContentHashReference),
+    crossCheckerVerdicts
+  } as DisputeRecord;
+}
+
+function normalizeHashReference(value: unknown): ContentHashReference | undefined {
+  if (typeof value === "string" && /^[0-9a-f]{64}$/.test(value)) return { sha256: value };
+  return isHashReference(value) ? value : undefined;
 }
 
 function isHashReference(value: unknown): value is ContentHashReference {

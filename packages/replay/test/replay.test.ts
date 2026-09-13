@@ -60,6 +60,50 @@ test("replays an FX dispute from Mirror Node and content storage", async () => {
   });
 });
 
+test("replays the compact dispute receipt used by the live HCS path", async () => {
+  const input = { actualRate: "1.10", expectedRate: "1.00", toleranceBps: 100 };
+  const inputSerialized = stableJson(input);
+  const inputHash = sha256(inputSerialized);
+  const buyerResponse = JSON.stringify({ rate: "1.10" });
+  const buyerResponseHash = sha256(buyerResponse);
+  const providerResponse = JSON.stringify({ rate: "1.00" });
+  const providerHash = sha256(providerResponse);
+  const record = {
+    schema: HCS_SCHEMA,
+    kind: "dispute" as const,
+    id: "dispute-compact",
+    recordedAt: "2026-09-11T00:00:00.000Z",
+    payload: {
+      providerId: "provider-1",
+      providerRoot: "provider-root",
+      buyerRoot: "buyer-root",
+      ruleId: "fx-rate-v1" as const,
+      input: inputHash,
+      buyer: buyerResponseHash,
+      responses: [providerHash, providerHash, providerHash],
+      votes: [
+        { checkerId: "checker-a", verdict: "accept" as const },
+        { checkerId: "checker-b", verdict: "accept" as const },
+        { checkerId: "checker-c", verdict: "accept" as const }
+      ],
+      verdict: "reject" as const
+    }
+  };
+  const encoded = Buffer.from(encodeHcsRecord(record)).toString("base64");
+  const fetchImpl: typeof fetch = async (inputUrl) => {
+    const url = String(inputUrl);
+    if (url === "https://mirror.invalid/api/v1/topics/0.0.7/messages") {
+      return new Response(JSON.stringify({ messages: [{ consensus_timestamp: "1", sequence_number: 1, message: encoded }], links: { next: null } }), { status: 200 });
+    }
+    if (url === `https://content.invalid/content/${inputHash}`) return new Response(inputSerialized, { status: 200 });
+    if (url === `https://content.invalid/content/${buyerResponseHash}`) return new Response(buyerResponse, { status: 200 });
+    if (url === `https://content.invalid/content/${providerHash}`) return new Response(providerResponse, { status: 200 });
+    throw new Error(`unexpected URL ${url}`);
+  };
+  const result = await replayDispute("dispute-compact", { mirrorNodeBaseUrl: "https://mirror.invalid", disputeTopicId: "0.0.7", contentStoreBaseUrl: "https://content.invalid" }, { fetchImpl });
+  assert.equal(result.matches, true);
+});
+
 test("rejects a dispute record with duplicate checker identities", async () => {
   const input = { actualRate: "1.00", expectedRate: "1.00", toleranceBps: 100 };
   const inputSerialized = stableJson(input);

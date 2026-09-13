@@ -24,6 +24,7 @@
     "provision:topics": "tsx scripts/provision-topics.ts",
     "provision:token": "tsx scripts/provision-token.ts",
     "register:provider": "tsx scripts/register-provider.ts",
+    "register:provider-endpoint": "tsx scripts/register-provider-endpoint.ts",
     "register:erc8004": "tsx scripts/register-erc8004.ts",
     "register:graph-agent": "tsx scripts/register-graph-agent.ts",
     "provision:graph-signers": "node --import tsx scripts/provision-graph-signers.ts",

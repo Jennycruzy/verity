@@ -166,22 +166,15 @@ export class SettlementCoordinator {
       id: request.disputeId,
       recordedAt: new Date().toISOString(),
       payload: {
-        requestId: request.requestId,
         providerId: request.providerId,
-        buyerId: request.buyerId,
         providerRoot: request.providerRoot,
         buyerRoot: request.buyerRoot,
         ruleId: request.ruleId,
-        evaluationInput: compactReference(request.evaluationInput),
-        buyerResponse: compactReference(request.buyerResponse),
-        providerResponses: request.providerResponses.map(compactReference),
-        crossCheckerVerdicts: request.crossCheckerVerdicts.map((vote) => ({ checkerId: vote.checkerId, verdict: vote.verdict })),
-        verdict: request.verdict.verdict,
-        buyerBondAmount: request.buyerBondAmount,
-        ...(request.bondTransactionId ? { bondTransactionId: request.bondTransactionId } : {}),
-        ...(request.bondScheduleId ? { bondScheduleId: request.bondScheduleId } : {}),
-        providerStakeAmount: request.providerStakeAmount,
-        resolution: state
+        input: request.evaluationInput.sha256,
+        buyer: request.buyerResponse.sha256,
+        responses: request.providerResponses.map((reference) => reference.sha256),
+        votes: request.crossCheckerVerdicts.map((vote) => ({ checkerId: vote.checkerId, verdict: vote.verdict })),
+        verdict: request.verdict.verdict
       }
     };
     const verdictRecord = {
@@ -319,8 +312,4 @@ async function resolveEscrow(
     bondResolutionTransactionId: resolution.transactionId,
     reputationTransactionId: reputation.transactionId
   };
-}
-
-function compactReference(reference: ContentReference): { sha256: string } {
-  return { sha256: reference.sha256 };
 }
